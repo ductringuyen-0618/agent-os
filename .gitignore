@@ -6,3 +6,6 @@ dist/
 *.db-journal
 *.db-wal
 coverage/
+*.tsbuildinfo
+test-results/
+playwright-report/

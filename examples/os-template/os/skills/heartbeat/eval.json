@@ -1,0 +1,24 @@
+{
+  "criteria": [
+    {
+      "key": "emitted_raw_added",
+      "weight": 0.4,
+      "description": "Called emit_event(raw.added) for every path in unindexedRaw"
+    },
+    {
+      "key": "no_disallowed_emit",
+      "weight": 0.2,
+      "description": "Never attempted emit_event with a type other than raw.added or custom.*"
+    },
+    {
+      "key": "noted_failures",
+      "weight": 0.3,
+      "description": "Wrote a remember() note to agents/ops.md for every failed or missed routine"
+    },
+    {
+      "key": "scheduled_lint_if_stale",
+      "weight": 0.1,
+      "description": "Called schedule(lint) when lint had not run in the last 24h"
+    }
+  ]
+}

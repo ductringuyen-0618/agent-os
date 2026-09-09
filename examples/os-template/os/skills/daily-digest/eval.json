@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "key": "wrote_digest_file",
+      "weight": 0.5,
+      "description": "Wrote output/digests/<today>.md via the Write tool"
+    },
+    {
+      "key": "remembered_link",
+      "weight": 0.3,
+      "description": "Called remember() on projects/digests.md linking to the new digest"
+    },
+    {
+      "key": "no_wiki_write_for_digest",
+      "weight": 0.2,
+      "description": "Did not attempt to write the digest itself through remember()"
+    }
+  ]
+}

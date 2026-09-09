@@ -7,12 +7,14 @@
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "build": "pnpm -r --if-present run build",
-    "test": "vitest run",
+    "test": "vitest run tools && pnpm -r --if-present run test",
     "lint": "biome check .",
     "dev": "pnpm --filter @agentos/cli exec node ./dist/bin.js"
   },
   "devDependencies": {
+    "@agentos/kernel": "workspace:*",
     "@biomejs/biome": "^1.9.0",
+    "execa": "^9.4.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0",
     "tsup": "^8.3.0"

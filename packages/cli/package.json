@@ -1,0 +1,18 @@
+{
+  "name": "@agentos/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "agentos": "./dist/bin.js" },
+  "scripts": {
+    "build": "tsup src/bin.ts --format esm --dts --out-dir dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentos/shared": "workspace:*",
+    "@agentos/kernel": "workspace:*",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22"
+  }
+}

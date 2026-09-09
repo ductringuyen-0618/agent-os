@@ -1,0 +1,5 @@
+{"type":"system","subtype":"init","session_id":"sess-tool-call","model":"claude-sonnet-5"}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"os/wiki/index.md"}}]},"session_id":"sess-tool-call"}
+{"type":"user","message":{"content":[{"type":"tool_result","content":"index.md contents"}]},"session_id":"sess-tool-call"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Done reading index."}]},"session_id":"sess-tool-call"}
+{"type":"result","subtype":"success","session_id":"sess-tool-call","total_cost_usd":0.0045,"usage":{"input_tokens":300,"output_tokens":80},"result":"Done reading index."}

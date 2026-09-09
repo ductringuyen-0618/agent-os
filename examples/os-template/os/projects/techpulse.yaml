@@ -1,0 +1,9 @@
+name: techpulse
+adapter: techpulse-coo
+repo: https://github.com/ductringuyen-0618/ai-tech-news-assistant
+clone: ${AGENTOS_CLONES}/techpulse
+base_branch: main
+options:
+  proposals_path: docs/missions/coo/proposals
+  state_path: docs/missions/coo/state.md
+  reports_path: docs/missions/coo/reports

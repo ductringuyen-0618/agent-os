@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "key": "cited_sources",
+      "weight": 0.5,
+      "description": "The answer cited at least one wiki page path it actually read."
+    },
+    {
+      "key": "no_fabrication",
+      "weight": 0.3,
+      "description": "Did not state a fact absent from wiki/ or raw/ as if it were known."
+    },
+    {
+      "key": "no_unnecessary_writes",
+      "weight": 0.2,
+      "description": "Only called remember when the research produced a genuinely new durable fact."
+    }
+  ]
+}

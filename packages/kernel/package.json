@@ -1,0 +1,42 @@
+{
+  "name": "@agentos/kernel",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./adapters/types": {
+      "types": "./dist/adapters/types.d.ts",
+      "import": "./dist/adapters/types.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --out-dir dist && tsup src/syscall/bin.ts --format esm --out-dir dist/syscall --clean=false && node -e \"const fs=require('fs'); fs.mkdirSync('dist/adapters',{recursive:true}); fs.writeFileSync('dist/adapters/types.js', \\\"export * from '../index.js'\\\\n\\\"); fs.writeFileSync('dist/adapters/types.d.ts', \\\"export * from '../index.js'\\\\n\\\")\" && node -e \"require('fs').copyFileSync('src/log/schema.sql','dist/schema.sql')\"",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentos/shared": "workspace:*",
+    "@fastify/static": "^8",
+    "@fastify/websocket": "^11",
+    "@modelcontextprotocol/sdk": "^1",
+    "better-sqlite3": "^12",
+    "croner": "^9",
+    "execa": "^9",
+    "fastify": "^5",
+    "gray-matter": "^4",
+    "nanoid": "^5",
+    "pino": "^9",
+    "simple-git": "^3",
+    "yaml": "^2",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7",
+    "@types/node": "^22",
+    "tsx": "^4.23.13"
+  }
+}

@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","session_id":"sess-init-success","model":"claude-haiku-4-5"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Heartbeat check complete."}]},"session_id":"sess-init-success"}
+{"type":"result","subtype":"success","session_id":"sess-init-success","total_cost_usd":0.0021,"usage":{"input_tokens":120,"output_tokens":40},"result":"Heartbeat check complete."}

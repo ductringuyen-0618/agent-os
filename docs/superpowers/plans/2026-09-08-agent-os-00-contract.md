@@ -11,7 +11,7 @@ Spec: `docs/superpowers/specs/2026-09-08-agent-os-design.md`
 - Node `>=22`, pnpm `>=9`, TypeScript `^5.6` with `"strict": true`, ESM only
   (`"type": "module"`), `moduleResolution: "Bundler"`.
 - Test runner: Vitest. Build: `tsup`. Lint/format: Biome (single tool).
-- Runtime deps (pinned major): `zod@^3`, `better-sqlite3@^11`, `croner@^9`,
+- Runtime deps (pinned major): `zod@^3`, `better-sqlite3@^12` (was ^11; ^12 ships Node 24 prebuilds), `croner@^9`,
   `fastify@^5` + `@fastify/websocket@^11` + `@fastify/static@^8`,
   `commander@^12`, `yaml@^2`, `@modelcontextprotocol/sdk@^1`, `execa@^9`,
   `simple-git@^3`, `gray-matter@^4`, `nanoid@^5`, `pino@^9`.
