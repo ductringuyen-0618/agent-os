@@ -308,11 +308,18 @@ export function buildServer(kernel: Kernel): FastifyInstance {
       }))
   })
 
-  app.get('/ws', { websocket: true }, (socket) => {
-    const unsubscribe = log.subscribe((event) => {
-      socket.send(JSON.stringify(event))
+  // Declared in a nested plugin so it loads after @fastify/websocket. In the
+  // root scope the `websocket: true` option is ignored (the plugin's onRoute
+  // hook isn't installed yet) and the route serves plain HTTP.
+  app.register(async (scope) => {
+    scope.get('/ws', { websocket: true }, (socket) => {
+      const unsubscribe = log.subscribe((event) => {
+        if (socket.readyState === socket.OPEN)
+          socket.send(JSON.stringify(event))
+      })
+      socket.on('close', unsubscribe)
+      socket.on('error', unsubscribe)
     })
-    socket.on('close', unsubscribe)
   })
 
   app.register(fastifyStatic, {

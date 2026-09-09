@@ -126,7 +126,14 @@ export class EventLog {
       runId: e.runId,
       payload: e.payload,
     }
-    for (const cb of this.subscribers) cb(event)
+    // A broken subscriber (e.g. a dead websocket) must never fail the producer.
+    for (const cb of this.subscribers) {
+      try {
+        cb(event)
+      } catch {
+        this.subscribers.delete(cb)
+      }
+    }
     return event
   }
 
