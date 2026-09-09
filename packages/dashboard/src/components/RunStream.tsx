@@ -93,9 +93,11 @@ function renderMessage(msg: ClaudeStreamMessage | Denied, key: number) {
 export function RunStream({
   runId,
   onClose,
+  showClose = true,
 }: {
   runId: string
   onClose: () => void
+  showClose?: boolean
 }) {
   const [history, setHistory] = useState<Event[] | null>(null)
   const { events: live } = useEvents(
@@ -139,13 +141,15 @@ export function RunStream({
           >
             Kill
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-quiet btn-sm"
-          >
-            Close
-          </button>
+          {showClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-quiet btn-sm"
+            >
+              Close
+            </button>
+          )}
         </div>
       </div>
       {history === null ? (
