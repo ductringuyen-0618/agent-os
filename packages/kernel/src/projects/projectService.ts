@@ -1,7 +1,8 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type {
   ProjectConfig,
+  ProjectListItem,
   RoutineConfig,
   RoutinesFile,
 } from '@agentos/shared'
@@ -51,6 +52,12 @@ export interface AddProjectResult {
   project: ProjectConfig
   sync: SyncResult
   syncError?: string
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  return stat(p)
+    .then(() => true)
+    .catch(() => false)
 }
 
 const DEFAULT_CHECKS = [
@@ -205,5 +212,44 @@ export class ProjectService {
         syncError: err instanceof Error ? err.message : String(err),
       }
     }
+  }
+
+  async listProjects(): Promise<ProjectListItem[]> {
+    const projects = await this.adapters.loadProjects()
+    const registered = new Set(this.scheduler.list().map((l) => l.routine.name))
+    return Promise.all(
+      projects.map(async (config) => {
+        const routineName = `${config.name}-sync`
+        const routines = registered.has(routineName) ? [routineName] : []
+        const lastSync = this.log.listRuns({
+          routine: `adapter:${config.name}`,
+          limit: 1,
+        })[0]
+        const proposalsPath = config.options.proposals_path
+        const hasCooLayout =
+          typeof proposalsPath === 'string'
+            ? await pathExists(path.join(config.clone, proposalsPath))
+            : true
+        return { config, routines, lastSync, hasCooLayout }
+      }),
+    )
+  }
+
+  async removeProject(name: string): Promise<void> {
+    const projects = await this.adapters.loadProjects()
+    const project = projects.find((p) => p.name === name)
+    if (!project) throw new ProjectNotFoundError(name)
+
+    await rm(path.join(this.cfg.osRoot, 'projects', `${name}.yaml`))
+
+    const routineName = `${name}-sync`
+    const { file: routinesFile, path: routinesPath } =
+      await this.loadRoutinesFile()
+    routinesFile.routines = routinesFile.routines.filter(
+      (r) => r.name !== routineName,
+    )
+    await this.saveRoutinesFile(routinesFile, routinesPath)
+    this.scheduler.unregisterRoutine(routineName)
+    // clone/ and raw/<name>/ deliberately untouched -- spec §4.2
   }
 }

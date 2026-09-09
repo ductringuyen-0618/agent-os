@@ -1,4 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,6 +17,7 @@ import { Scheduler } from '../scheduler/scheduler.js'
 import { WikiService } from '../wiki/wikiService.js'
 import {
   ProjectNameCollisionError,
+  ProjectNotFoundError,
   ProjectService,
   deriveProjectName,
 } from './projectService.js'
@@ -221,5 +228,93 @@ describe('ProjectService.addProject', () => {
     )
     expect(result.project.build?.checks).toContain('pnpm -r --if-present lint')
     expect(result.project.build?.checks).toContain('pnpm -r --if-present test')
+  })
+})
+
+describe('ProjectService.listProjects', () => {
+  it('reports config, registered routines, lastSync and hasCooLayout', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    seedRoutinesFile(osRoot)
+    process.env.AGENTOS_GH_BIN = fakeGhBin
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(cfg.dbPath)
+    const wiki = new WikiService(osRoot, log)
+    const registry = {
+      'techpulse-coo': {
+        name: 'techpulse-coo',
+        sync: async () => ({
+          added: [],
+          changed: [],
+          events: [],
+          hasCooLayout: false,
+        }),
+        applyDecision: async () => {},
+      },
+    }
+    const adapters = new AdapterHost(cfg, log, wiki, registry)
+    const scheduler = new Scheduler(cfg, log, async () => {})
+    const service = new ProjectService(cfg, adapters, scheduler, log)
+    await service.addProject({ repo: 'octo/widgets' })
+
+    const list = await service.listProjects()
+
+    expect(list).toHaveLength(1)
+    expect(list[0].config.name).toBe('widgets')
+    expect(list[0].routines).toEqual(['widgets-sync'])
+    expect(list[0].lastSync?.status).toBe('success')
+    expect(list[0].hasCooLayout).toBe(false)
+  })
+
+  it('returns an empty array with no projects registered', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const { service } = makeService(osRoot)
+    expect(await service.listProjects()).toEqual([])
+  })
+})
+
+describe('ProjectService.removeProject', () => {
+  it('deletes the project yaml, removes the routine from routines.yaml, and unregisters it live -- keeping the clone/raw mirror untouched', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    seedRoutinesFile(osRoot)
+    process.env.AGENTOS_GH_BIN = fakeGhBin
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(cfg.dbPath)
+    const wiki = new WikiService(osRoot, log)
+    const registry = {
+      'techpulse-coo': {
+        name: 'techpulse-coo',
+        sync: async () => ({ added: [], changed: [], events: [] }),
+        applyDecision: async () => {},
+      },
+    }
+    const adapters = new AdapterHost(cfg, log, wiki, registry)
+    const scheduler = new Scheduler(cfg, log, async () => {})
+    const service = new ProjectService(cfg, adapters, scheduler, log)
+    await service.addProject({ repo: 'octo/widgets' })
+    mkdirSync(path.join(osRoot, 'raw', 'widgets'), { recursive: true })
+    writeFileSync(path.join(osRoot, 'raw', 'widgets', 'state.md'), '# kept\n')
+
+    await service.removeProject('widgets')
+
+    expect(existsSync(path.join(osRoot, 'projects', 'widgets.yaml'))).toBe(
+      false,
+    )
+    expect(
+      readFileSync(path.join(osRoot, 'routines.yaml'), 'utf8'),
+    ).not.toContain('widgets-sync')
+    expect(
+      scheduler.list().some((l) => l.routine.name === 'widgets-sync'),
+    ).toBe(false)
+    expect(existsSync(path.join(osRoot, 'raw', 'widgets', 'state.md'))).toBe(
+      true,
+    )
+  })
+
+  it('throws ProjectNotFoundError for an unknown project', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const { service } = makeService(osRoot)
+    await expect(service.removeProject('nope')).rejects.toThrow(
+      ProjectNotFoundError,
+    )
   })
 })
