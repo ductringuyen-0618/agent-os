@@ -67,5 +67,7 @@ describe('ProcessManager mcp wiring', () => {
     expect(mcpIdx).toBeGreaterThanOrEqual(0)
     expect(argv[mcpIdx + 1]).toBe(spec.mcpConfigPath)
     expect(argv).toContain('--strict-mcp-config')
+    // claude -p exits 1 immediately for stream-json output without --verbose
+    expect(argv).toContain('--verbose')
   })
 })
