@@ -73,6 +73,9 @@ importers:
       '@types/node':
         specifier: ^22
         version: 22.20.1
+      simple-git:
+        specifier: ^3
+        version: 3.36.0
 
   packages/dashboard:
     dependencies:
@@ -174,9 +177,6 @@ importers:
         specifier: ^3
         version: 3.25.76
     devDependencies:
-      '@agentos/adapters':
-        specifier: workspace:*
-        version: link:../adapters
       '@types/better-sqlite3':
         specifier: ^7
         version: 7.6.13

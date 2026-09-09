@@ -2,20 +2,24 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { adapterRegistry } from '@agentos/adapters'
-import type { FeatureRequestInput, ProjectConfig } from '@agentos/shared'
-import simpleGit from 'simple-git'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ProjectAdapter } from '../../adapters/types.js'
-import { EventLog } from '../../log/eventLog.js'
-import type { RunResult } from '../../process/processManager.js'
-import { WikiService } from '../../wiki/wikiService.js'
+// Lives in the CLI package on purpose: it exercises the real techpulse-coo
+// adapter against the kernel's feature-request definition, and the CLI is
+// the one package that legitimately depends on both. Keeping it inside the
+// kernel would make the kernel depend on adapters and break the build order.
 import {
+  EventLog,
   type FeatureRequestDeps,
   type FeatureRequestKernelDeps,
+  type ProjectAdapter,
+  type RunResult,
+  WikiService,
   createFeatureRequestCwdPolicy,
   createFeatureRequestWorkflow,
   parsePassFail,
-} from './featureRequest.js'
+} from '@agentos/kernel'
+import type { FeatureRequestInput, ProjectConfig } from '@agentos/shared'
+import simpleGit from 'simple-git'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // @agentos/adapters is built against @agentos/kernel's PUBLISHED (dist)
 // type declarations; this file, compiled as part of @agentos/kernel

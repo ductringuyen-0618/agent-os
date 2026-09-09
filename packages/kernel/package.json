@@ -40,7 +40,6 @@
     "zod": "^3"
   },
   "devDependencies": {
-    "@agentos/adapters": "workspace:*",
     "@types/better-sqlite3": "^7",
     "@types/node": "^22",
     "tsx": "^4.23.13"
