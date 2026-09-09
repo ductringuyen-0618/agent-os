@@ -22,7 +22,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm build
-      - run: pnpm -r run typecheck
+      - name: typecheck
+        run: pnpm -r exec tsc --noEmit
       - run: pnpm test
       - name: gitleaks
         uses: gitleaks/gitleaks-action@v2
