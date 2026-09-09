@@ -18,7 +18,10 @@ import { assemblePrompt } from './process/promptAssembler.js'
 import { Scheduler } from './scheduler/scheduler.js'
 import { WikiService } from './wiki/wikiService.js'
 import { WorkflowEngine } from './workflow/engine.js'
-import type { WorkflowDefinition } from './workflow/types.js'
+import type {
+  WorkflowDefinition,
+  WorkflowRuntimeDeps,
+} from './workflow/types.js'
 
 export interface Kernel {
   cfg: KernelConfig
@@ -51,6 +54,7 @@ class KernelImpl implements Kernel {
     public cfg: KernelConfig,
     registry: Record<string, ProjectAdapter> = {},
     workflowDefinitions: WorkflowDefinition[] = [],
+    cwdPolicy?: WorkflowRuntimeDeps['cwdPolicy'],
   ) {
     this.log = new EventLog(cfg.dbPath)
     this.pm = new ProcessManager(cfg, this.log)
@@ -59,7 +63,7 @@ class KernelImpl implements Kernel {
     this.scheduler = new Scheduler(cfg, this.log, (routine, payload) =>
       this.exec(routine, payload),
     )
-    this.workflows = new WorkflowEngine(cfg, this.log, this.pm)
+    this.workflows = new WorkflowEngine(cfg, this.log, this.pm, cwdPolicy)
     for (const def of workflowDefinitions) this.workflows.registry.register(def)
   }
 
@@ -191,6 +195,7 @@ export function createKernel(
   cfg: KernelConfig,
   registry: Record<string, ProjectAdapter> = {},
   workflowDefinitions: WorkflowDefinition[] = [],
+  cwdPolicy?: WorkflowRuntimeDeps['cwdPolicy'],
 ): Kernel {
-  return new KernelImpl(cfg, registry, workflowDefinitions)
+  return new KernelImpl(cfg, registry, workflowDefinitions, cwdPolicy)
 }

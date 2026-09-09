@@ -170,6 +170,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
     const result: SyncResult = { added: [], changed: [], events: [] }
 
     const proposalsDir = path.join(ctx.project.clone, opts.proposals_path)
+    const hasCooLayout = await pathExists(proposalsDir)
     for (const file of await listMdFiles(proposalsDir)) {
       // posix form so refs/events are identical on every OS
       const destRel = `proposals/${file}`
@@ -210,6 +211,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
       await mirrorFile(ctx, statePath, 'state.md', result)
     }
 
+    result.hasCooLayout = hasCooLayout
     return result
   },
   async applyDecision(decision: Decision, ctx: AdapterContext): Promise<void> {

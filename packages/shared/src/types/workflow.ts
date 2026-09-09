@@ -47,3 +47,14 @@ export interface WorkflowStep {
   startedAt: string
   endedAt?: string
 }
+
+/** Input of the `feature-request` workflow (spec 2026-09-09 §5.1). */
+export interface FeatureRequestInput {
+  project: string
+  /** Short; becomes the proposal H1 and the branch slug. */
+  title: string
+  /** The operator's own words, any length. */
+  description: string
+  /** Default true: the operator wrote it, so it is already approved. */
+  autoApprove: boolean
+}

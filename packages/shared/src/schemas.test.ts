@@ -225,3 +225,37 @@ describe('RoutinesFileSchema workflows block', () => {
     expect(file.workflows).toBeUndefined()
   })
 })
+
+describe('ProjectConfigSchema build block', () => {
+  it('accepts a project with a build block', () => {
+    const parsed = ProjectConfigSchema.parse({
+      name: 'demo',
+      adapter: 'techpulse-coo',
+      repo: 'o/r',
+      clone: '${AGENTOS_CLONES}/demo',
+      base_branch: 'main',
+      options: {},
+      build: {
+        enabled: true,
+        model: 'sonnet',
+        permission_mode: 'acceptEdits',
+        allowed_tools: ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'],
+        checks: ['pnpm -r --if-present typecheck'],
+        timeout_ms: 2_400_000,
+      },
+    })
+    expect(parsed.build?.checks).toEqual(['pnpm -r --if-present typecheck'])
+  })
+
+  it('accepts a project with no build block (build stays undefined)', () => {
+    const parsed = ProjectConfigSchema.parse({
+      name: 'demo',
+      adapter: 'techpulse-coo',
+      repo: 'o/r',
+      clone: '${AGENTOS_CLONES}/demo',
+      base_branch: 'main',
+      options: {},
+    })
+    expect(parsed.build).toBeUndefined()
+  })
+})
