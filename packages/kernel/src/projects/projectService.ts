@@ -13,6 +13,7 @@ import type { SyncResult } from '../adapters/types.js'
 import type { KernelConfig } from '../config.js'
 import {
   assertValidRepoName,
+  getCloneUrl,
   getDefaultBranch,
   readRepoFile,
 } from '../github/gh.js'
@@ -150,6 +151,7 @@ export class ProjectService {
     }
 
     const baseBranch = input.baseBranch ?? (await getDefaultBranch(input.repo))
+    const cloneUrl = await getCloneUrl(input.repo)
 
     const options =
       adapter === 'techpulse-coo'
@@ -163,7 +165,7 @@ export class ProjectService {
     const project: ProjectConfig = {
       name,
       adapter,
-      repo: input.repo,
+      repo: cloneUrl,
       clone: `\${AGENTOS_CLONES}/${name}`,
       base_branch: baseBranch,
       options,

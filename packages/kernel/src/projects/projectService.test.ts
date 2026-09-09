@@ -118,6 +118,8 @@ describe('ProjectService.addProject', () => {
     const service = new ProjectService(cfg, adapters, scheduler, log)
 
     const result = await service.addProject({ repo: 'octo/widgets' })
+    // The yaml stores a real clone URL, never the bare owner/name.
+    expect(result.project.repo).toBe('https://github.com/octo/widgets.git')
 
     expect(result.project.name).toBe('widgets')
     expect(result.project.base_branch).toBe('main')

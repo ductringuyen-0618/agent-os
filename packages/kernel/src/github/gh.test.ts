@@ -24,6 +24,8 @@ beforeEach(() => {
   delete process.env.FAKE_GH_DEFAULT_BRANCH
   // biome-ignore lint/performance/noDelete: see comment above
   delete process.env.FAKE_GH_FILE_FIXTURE
+  // biome-ignore lint/performance/noDelete: see comment above
+  delete process.env.FAKE_GH_CLONE_URL
 })
 
 describe('assertValidRepoName', () => {
@@ -116,5 +118,27 @@ describe('readRepoFile', () => {
   it('returns null when the file is absent (404), without throwing', async () => {
     const { readRepoFile } = await import('./gh.js')
     expect(await readRepoFile('octo/widgets', 'package.json')).toBeNull()
+  })
+})
+
+describe('getCloneUrl', () => {
+  it('returns the https clone url with a .git suffix', async () => {
+    const { getCloneUrl } = await import('./gh.js')
+    await expect(getCloneUrl('octo/widgets')).resolves.toBe(
+      'https://github.com/octo/widgets.git',
+    )
+  })
+
+  it('passes a local path through untouched (e2e fixtures)', async () => {
+    process.env.FAKE_GH_CLONE_URL = '/tmp/fake-remote.git'
+    const { getCloneUrl } = await import('./gh.js')
+    await expect(getCloneUrl('octo/widgets')).resolves.toBe(
+      '/tmp/fake-remote.git',
+    )
+  })
+
+  it('rejects an invalid repo name before spawning gh', async () => {
+    const { getCloneUrl } = await import('./gh.js')
+    await expect(getCloneUrl('nope')).rejects.toThrow(/invalid repo name/)
   })
 })

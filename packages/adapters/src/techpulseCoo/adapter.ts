@@ -33,10 +33,24 @@ async function pathExists(p: string): Promise<boolean> {
     .catch(() => false)
 }
 
+// A clone or fetch of a repo the local git has no credentials for must fail
+// fast, not hang on a credential prompt the daemon can never answer.
+// GIT_EDITOR is dropped because simple-git refuses to forward it.
+const {
+  GIT_EDITOR: _e,
+  GIT_SEQUENCE_EDITOR: _s,
+  ...INHERITED_ENV
+} = process.env
+const NO_PROMPT_ENV = {
+  ...INHERITED_ENV,
+  GIT_TERMINAL_PROMPT: '0',
+  GCM_INTERACTIVE: 'never',
+}
+
 export async function ensureClone(ctx: AdapterContext): Promise<void> {
   const { project } = ctx
   if (await pathExists(path.join(project.clone, '.git'))) {
-    const repoGit = simpleGit(project.clone)
+    const repoGit = simpleGit(project.clone).env(NO_PROMPT_ENV)
     await repoGit.fetch('origin')
     await repoGit.checkout(project.base_branch)
     await repoGit.pull('origin', project.base_branch, ['--ff-only'])
@@ -45,10 +59,9 @@ export async function ensureClone(ctx: AdapterContext): Promise<void> {
   await mkdir(path.dirname(project.clone), { recursive: true })
   // Clone the configured branch explicitly: a remote whose HEAD points at a
   // different (or unborn) branch would otherwise yield an empty working tree.
-  await simpleGit().clone(project.repo, project.clone, [
-    '--branch',
-    project.base_branch,
-  ])
+  await simpleGit()
+    .env(NO_PROMPT_ENV)
+    .clone(project.repo, project.clone, ['--branch', project.base_branch])
 }
 
 async function listMdFiles(dir: string): Promise<string[]> {

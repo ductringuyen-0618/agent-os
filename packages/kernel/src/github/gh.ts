@@ -96,6 +96,31 @@ export async function listRepos(query?: string): Promise<GithubRepo[]> {
   }))
 }
 
+/**
+ * The HTTPS clone URL for `owner/name`, as GitHub reports it. Stored in the
+ * project yaml so every later git operation has a real remote, not a bare
+ * owner/name that git would treat as a local path.
+ */
+export async function getCloneUrl(repo: string): Promise<string> {
+  assertValidRepoName(repo)
+  await requireGh()
+  const result = await gh([
+    'repo',
+    'view',
+    repo,
+    '--json',
+    'url',
+    '--jq',
+    '.url',
+  ])
+  if (result.exitCode !== 0) throw new GhUnavailableError(UNAVAILABLE_HINT)
+  const url = result.stdout.trim()
+  if (!url) throw new GhUnavailableError(UNAVAILABLE_HINT)
+  return url.endsWith('.git') || url.startsWith('file:') || url.startsWith('/')
+    ? url
+    : `${url}.git`
+}
+
 export async function getDefaultBranch(repo: string): Promise<string> {
   assertValidRepoName(repo)
   await requireGh()

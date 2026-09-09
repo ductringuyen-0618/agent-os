@@ -1,9 +1,0 @@
-name: widgets
-adapter: techpulse-coo
-repo: octo/widgets
-clone: ${AGENTOS_CLONES}/widgets
-base_branch: main
-options:
-  proposals_path: docs/missions/coo/proposals
-  state_path: docs/missions/coo/state.md
-  reports_path: docs/missions/coo/reports

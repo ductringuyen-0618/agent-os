@@ -29,6 +29,16 @@ function main() {
     process.exit(0)
   }
 
+  if (argv[0] === 'repo' && argv[1] === 'view') {
+    // `gh repo view owner/name --json url --jq .url`. FAKE_GH_CLONE_URL lets
+    // the e2e kernel point every project at a local bare repo instead of
+    // GitHub, so no clone ever leaves the machine.
+    process.stdout.write(
+      process.env.FAKE_GH_CLONE_URL ?? `https://github.com/${argv[2]}`,
+    )
+    process.exit(0)
+  }
+
   if (argv[0] === 'repo' && argv[1] === 'list') {
     const fixture = process.env.FAKE_GH_REPOS_FIXTURE
     process.stdout.write(fixture ? fs.readFileSync(fixture, 'utf8') : '[]')

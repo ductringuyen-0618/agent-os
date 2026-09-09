@@ -58,8 +58,5 @@ routines:
       - Grep
       - mcp__agentos__remember
       - mcp__agentos__read_wiki
-  - name: widgets-sync
-    every: 1h
-    adapter: widgets
 workflows:
   max_concurrent: 2
