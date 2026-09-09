@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@agentos/kernel':
+        specifier: workspace:*
+        version: link:packages/kernel
       '@biomejs/biome':
         specifier: ^1.9.0
         version: 1.9.4

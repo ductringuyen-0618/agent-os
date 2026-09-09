@@ -12,6 +12,7 @@
     "dev": "pnpm --filter @agentos/cli exec node ./dist/bin.js"
   },
   "devDependencies": {
+    "@agentos/kernel": "workspace:*",
     "@biomejs/biome": "^1.9.0",
     "execa": "^9.4.0",
     "typescript": "^5.6.0",
