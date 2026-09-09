@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiClient, ApiError, type CostEntry } from '../api/client'
+import { CostChart } from '../components/CostChart'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
-import { Spinner } from '../components/Spinner'
+import { SkeletonRows } from '../components/Skeleton'
+import { todayKey, usd } from '../lib/time'
 
 const client = new ApiClient()
+const DAYS = 14
 
 export function CostsPanel() {
   const [entries, setEntries] = useState<CostEntry[] | null>(null)
@@ -13,7 +16,7 @@ export function CostsPanel() {
   const load = useCallback(() => {
     setError(null)
     client
-      .costs(14)
+      .costs(DAYS)
       .then(setEntries)
       .catch((e) =>
         setError(e instanceof ApiError ? e.message : 'Failed to load costs'),
@@ -24,78 +27,62 @@ export function CostsPanel() {
     load()
   }, [load])
 
-  if (error) {
-    return (
-      <section>
-        <h2 className="mb-4 text-lg font-medium">Costs</h2>
-        <ErrorState message={error} onRetry={load} />
-      </section>
-    )
-  }
-  if (entries === null) {
-    return (
-      <section>
-        <h2 className="mb-4 text-lg font-medium">Costs</h2>
-        <Spinner label="Loading costs…" />
-      </section>
-    )
-  }
-  if (entries.length === 0) {
-    return (
-      <section>
-        <h2 className="mb-4 text-lg font-medium">Costs</h2>
-        <EmptyState
-          title="No spend yet"
-          body="Costs appear after the first run completes."
-        />
-      </section>
-    )
-  }
-
-  const byDay = new Map<string, number>()
-  for (const e of entries) byDay.set(e.day, (byDay.get(e.day) ?? 0) + e.costUsd)
-  const days = [...byDay.keys()].sort()
-  const max = Math.max(...byDay.values(), 0.01)
-  const width = 24
-  const gap = 12
-  const height = 140
+  const total = entries?.reduce((s, e) => s + e.costUsd, 0) ?? 0
+  const today = todayKey()
+  const spentToday =
+    entries
+      ?.filter((e) => e.day === today)
+      .reduce((s, e) => s + e.costUsd, 0) ?? 0
+  const byAgent = new Map<string, number>()
+  for (const e of entries ?? [])
+    byAgent.set(e.agent, (byAgent.get(e.agent) ?? 0) + e.costUsd)
+  const topAgent = [...byAgent.entries()].sort((a, b) => b[1] - a[1])[0]
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-medium">Costs</h2>
-      <svg
-        width={days.length * (width + gap)}
-        height={height + 24}
-        role="img"
-        aria-label="Daily cost in USD"
-      >
-        {days.map((day, i) => {
-          const value = byDay.get(day) ?? 0
-          const barHeight = Math.max(2, (value / max) * height)
-          return (
-            <g key={day} transform={`translate(${i * (width + gap)}, 0)`}>
-              <rect
-                data-testid={`cost-bar-${day}`}
-                x={0}
-                y={height - barHeight}
-                width={width}
-                height={barHeight}
-                fill="var(--color-accent)"
-                rx={2}
-              />
-              <text
-                x={width / 2}
-                y={height + 16}
-                textAnchor="middle"
-                fontSize={10}
-                fill="var(--color-muted)"
-              >
-                {day.slice(5)}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
+      <div className="mb-4 border-b border-border">
+        <h2 className="pb-1.5 text-lg font-medium">Costs</h2>
+      </div>
+      {error && <ErrorState message={error} onRetry={load} />}
+      {!error && entries === null && (
+        <SkeletonRows rows={3} label="Loading costs…" />
+      )}
+      {!error && entries !== null && entries.length === 0 && (
+        <EmptyState
+          title="No spend yet"
+          body="Every completed run reports what it cost. The first one will draw the first bar here."
+        />
+      )}
+      {!error && entries !== null && entries.length > 0 && (
+        <>
+          <dl className="mb-5 grid grid-cols-3 gap-3">
+            <div className="card px-4 py-3">
+              <dt className="text-xs text-muted">Last {DAYS} days</dt>
+              <dd className="mt-1 font-mono text-xl text-text">{usd(total)}</dd>
+            </div>
+            <div className="card px-4 py-3">
+              <dt className="text-xs text-muted">Today</dt>
+              <dd className="mt-1 font-mono text-xl text-text">
+                {usd(spentToday)}
+              </dd>
+            </div>
+            <div className="card px-4 py-3">
+              <dt className="text-xs text-muted">Biggest spender</dt>
+              <dd className="mt-1 truncate font-mono text-xl text-text">
+                {topAgent ? topAgent[0] : '—'}
+                {topAgent && (
+                  <span className="ml-2 text-sm text-muted">
+                    {usd(topAgent[1])}
+                  </span>
+                )}
+              </dd>
+            </div>
+          </dl>
+          <div className="card p-4">
+            <CostChart entries={entries} window={DAYS} />
+          </div>
+        </>
+      )}
     </section>
   )
 }

@@ -1,19 +1,40 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
-import { installMockFetch } from '../tests/mockServer'
+import { describe, expect, it, vi } from 'vitest'
+import { MockWebSocket, installMockFetch } from '../tests/mockServer'
 import App from './App'
 
 describe('App', () => {
-  it('switches panels via left nav', async () => {
+  it('opens on the overview and switches panels via the left nav', async () => {
     installMockFetch()
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
     render(<App />)
     expect(
       screen.getByRole('navigation', { name: /agent-os/i }),
     ).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Decisions' }))
+    expect(
+      screen.getByRole('heading', { name: 'Overview' }),
+    ).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Decisions/ }))
     expect(
       await screen.findByRole('heading', { name: 'Decisions' }),
     ).toBeInTheDocument()
+  })
+
+  it('switches panels with number keys, but not while typing', async () => {
+    installMockFetch()
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
+    render(
+      <>
+        <input aria-label="scratch" />
+        <App />
+      </>,
+    )
+    await userEvent.keyboard('2')
+    expect(
+      await screen.findByRole('heading', { name: 'Runs' }),
+    ).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('scratch'), '7')
+    expect(screen.getByRole('heading', { name: 'Runs' })).toBeInTheDocument()
   })
 })

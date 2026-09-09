@@ -58,7 +58,7 @@ export function WikiPage({
     },
   }
   return (
-    <div className="prose prose-invert prose-sm max-w-none">
+    <div className="prose-agentos">
       <ReactMarkdown
         components={components}
         urlTransform={wikiAwareUrlTransform}

@@ -7,7 +7,7 @@ describe('ErrorState', () => {
   it('calls onRetry when clicked', async () => {
     const onRetry = vi.fn()
     render(<ErrorState message="failed to load" onRetry={onRetry} />)
-    await userEvent.click(screen.getByRole('button', { name: /retry/i }))
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }))
     expect(onRetry).toHaveBeenCalledOnce()
   })
 })

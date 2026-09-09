@@ -34,6 +34,62 @@ describe('RunStream', () => {
     expect(await screen.findByText('hello from replay')).toBeInTheDocument()
   })
 
+  it('reads the kernel shape (message as the payload itself)', async () => {
+    installMockFetch({
+      'GET /api/runs/run_1/events': () => [
+        {
+          id: 1,
+          ts: 't',
+          type: 'run.stream',
+          runId: 'run_1',
+          payload: {
+            type: 'assistant',
+            session_id: 's',
+            message: { content: [{ type: 'text', text: 'direct payload' }] },
+          },
+        },
+        {
+          id: 2,
+          ts: 't',
+          type: 'run.stream',
+          runId: 'run_1',
+          payload: {
+            type: 'system',
+            subtype: 'permission_denied',
+            tool_name: 'Edit',
+            message: 'Cannot write learnings.md',
+          },
+        },
+        { id: 3, ts: 't', type: 'run.started', runId: 'run_1', payload: {} },
+      ],
+    })
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
+    render(
+      <ToastProvider>
+        <RunStream runId="run_1" onClose={() => {}} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('direct payload')).toBeInTheDocument()
+    expect(
+      screen.getByText(/Permission denied for Edit: Cannot write/),
+    ).toBeInTheDocument()
+  })
+
+  it('says so when a run produced no output', async () => {
+    installMockFetch({
+      'GET /api/runs/run_1/events': () => [
+        { id: 3, ts: 't', type: 'run.started', runId: 'run_1', payload: {} },
+      ],
+    })
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
+    render(
+      <ToastProvider>
+        <RunStream runId="run_1" onClose={() => {}} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText(/no output recorded/i)).toBeInTheDocument()
+  })
+
   it('kills the run', async () => {
     const kill = vi.fn(() => ({ ok: true }))
     installMockFetch({
