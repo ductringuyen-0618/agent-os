@@ -77,6 +77,43 @@ describe('WikiService.writePage', () => {
     ).rejects.toThrow(/raw\//)
   })
 
+  it('refuses a path that traverses out of wiki/ into raw/', async () => {
+    await expect(
+      wiki.writePage({
+        path: '../raw/techpulse/proposals/001-slug.md',
+        content: 'PWNED',
+      }),
+    ).rejects.toThrow(/escapes the wiki directory/)
+    const original = await fs.readFile(
+      path.join(osRoot, 'raw', 'techpulse', 'proposals', '001-slug.md'),
+      'utf8',
+    )
+    expect(original).toBe('# proposal')
+  })
+
+  it('refuses a path that traverses entirely outside osRoot', async () => {
+    await expect(
+      wiki.writePage({ path: '../../../../etc/escape.md', content: 'ESCAPED' }),
+    ).rejects.toThrow(/escapes the wiki directory/)
+  })
+
+  it('refuses to read a path that traverses out of wiki/', async () => {
+    await expect(
+      wiki.readPage('../raw/techpulse/proposals/001-slug.md'),
+    ).rejects.toThrow(/escapes the wiki directory/)
+  })
+
+  it('scans links for secrets, not just content', async () => {
+    await expect(
+      wiki.writePage({
+        path: 'projects/leak2.md',
+        content: 'clean content',
+        links: ['AKIAABCDEFGHIJKLMNOP'],
+      }),
+    ).rejects.toThrow(SecretDetectedError)
+    expect(log.listEvents({ types: ['security.redacted'] })).toHaveLength(1)
+  })
+
   it('refuses secrets and emits security.redacted instead of wiki.written', async () => {
     await expect(
       wiki.writePage({

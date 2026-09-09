@@ -34,16 +34,43 @@ export class WikiService {
     return path.join(this.wikiDir(), 'log.md')
   }
 
+  /**
+   * Resolves a caller-supplied wiki-relative path and guarantees it stays
+   * inside wiki/. A literal "raw/" prefix is refused as its own case (so the
+   * error names raw/ specifically, since that's the invariant callers are
+   * meant to understand), but the real containment guard is the resolved-path
+   * check below: path.join alone silently collapses ".." segments, so a path
+   * like "../raw/x.md" or "../../etc/passwd" would otherwise both skip the
+   * literal "raw/" prefix check AND land outside wiki/ entirely (verified
+   * exploitable in review before this fix — CVE-worthy in a real deployment
+   * since this is the only write path agent-driven code has).
+   */
+  private resolveWikiPath(p: string): string {
+    const normalized = p.replace(/\\/g, '/')
+    if (normalized.startsWith('raw/')) {
+      throw new Error(`WikiService refused: "${p}" is under raw/ (immutable)`)
+    }
+    const wikiDirResolved = path.resolve(this.wikiDir())
+    const full = path.resolve(wikiDirResolved, normalized)
+    if (
+      full !== wikiDirResolved &&
+      !full.startsWith(wikiDirResolved + path.sep)
+    ) {
+      throw new Error(`WikiService refused: "${p}" escapes the wiki directory`)
+    }
+    return full
+  }
+
   async writePage(
     i: WritePageInput,
   ): Promise<{ result: 'created' | 'updated'; path: string }> {
     const normalized = i.path.replace(/\\/g, '/')
-    if (normalized.startsWith('raw/')) {
-      throw new Error(
-        `WikiService.writePage refused: "${i.path}" is under raw/ (immutable)`,
-      )
-    }
-    const secrets = findSecrets(i.content)
+    const full = this.resolveWikiPath(i.path)
+    // Scan links too, not just content: they end up written verbatim into
+    // the page's frontmatter and into index.md's rendered sources, so a
+    // secret hiding in a `links` entry would otherwise bypass redaction
+    // entirely (this module is the only path agent-driven writes go through).
+    const secrets = findSecrets([i.content, ...(i.links ?? [])].join('\n'))
     if (secrets.length > 0) {
       this.log.append({
         type: 'security.redacted',
@@ -53,7 +80,6 @@ export class WikiService {
       throw new SecretDetectedError(secrets)
     }
 
-    const full = path.join(this.wikiDir(), normalized)
     await fs.mkdir(path.dirname(full), { recursive: true })
     const existed = await fs.access(full).then(
       () => true,
@@ -98,7 +124,7 @@ export class WikiService {
   }
 
   async readPage(p: string): Promise<string> {
-    return fs.readFile(path.join(this.wikiDir(), p), 'utf8')
+    return fs.readFile(this.resolveWikiPath(p), 'utf8')
   }
 
   async readIndex(): Promise<string> {
