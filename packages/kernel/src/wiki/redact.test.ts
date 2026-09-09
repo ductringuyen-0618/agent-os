@@ -30,6 +30,24 @@ describe('findSecrets', () => {
     expect(secrets).toContain('anthropic_key')
     expect(secrets).not.toContain('openai_key')
   })
+  it('detects modern hyphenated OpenAI key formats (sk-proj-, sk-svcacct-)', () => {
+    expect(findSecrets(`sk-proj-${'x'.repeat(40)}`)).toContain('openai_key')
+    expect(findSecrets(`sk-svcacct-${'x'.repeat(40)}`)).toContain('openai_key')
+  })
+  it('detects gho_/ghu_/ghs_/ghr_ GitHub token prefixes', () => {
+    expect(findSecrets(`token: gho_${'a'.repeat(36)}`)).toContain(
+      'github_token',
+    )
+    expect(findSecrets(`token: ghu_${'a'.repeat(36)}`)).toContain(
+      'github_token',
+    )
+    expect(findSecrets(`token: ghs_${'a'.repeat(36)}`)).toContain(
+      'github_token',
+    )
+    expect(findSecrets(`token: ghr_${'a'.repeat(36)}`)).toContain(
+      'github_token',
+    )
+  })
   it('detects a PEM private key header', () => {
     expect(findSecrets('-----BEGIN RSA PRIVATE KEY-----\nMIIB...')).toContain(
       'private_key',
