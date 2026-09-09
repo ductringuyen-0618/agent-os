@@ -20,6 +20,7 @@ export type EventType =
   | 'ops.alert'
   | 'security.redacted'
   | `custom.${string}`
+  | `workflow.${string}`
 
 export interface Event {
   id: number

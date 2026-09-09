@@ -37,3 +37,6 @@ routines:
     after: [lint]
     permission_mode: acceptEdits
     allowed_tools: [Read, Write, Glob, Grep, mcp__agentos__remember, mcp__agentos__read_wiki]
+
+workflows:
+  max_concurrent: 2

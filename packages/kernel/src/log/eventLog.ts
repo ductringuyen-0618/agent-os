@@ -9,14 +9,34 @@ import type {
   Message,
   Run,
   RunStatus,
+  WorkflowInstance,
+  WorkflowStatus,
+  WorkflowStep,
+  WorkflowStepStatus,
 } from '@agentos/shared'
 import Database from 'better-sqlite3'
 import { nanoid } from 'nanoid'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// Module-level (not per-instance) so ordering holds even across multiple
+// EventLog instances created in the same process, as tests do.
+let lastNowMs = 0
+
+/**
+ * Millisecond-resolution wall clock, but strictly increasing per process.
+ * Plain `Date.now()` can tie within the same millisecond on fast in-memory
+ * SQLite (no I/O latency between an INSERT's default timestamp and a
+ * following UPDATE's `nowIso()` call), which made e.g. `updateWorkflow`'s
+ * `updatedAt` intermittently equal the row's `createdAt` -- a real flake,
+ * not a one-off. Clamping to `lastNowMs + 1` when the clock hasn't visibly
+ * advanced keeps every timestamp this module hands out strictly ordered.
+ */
 function nowIso(): string {
-  return new Date().toISOString()
+  let ms = Date.now()
+  if (ms <= lastNowMs) ms = lastNowMs + 1
+  lastNowMs = ms
+  return new Date(ms).toISOString()
 }
 
 /**
@@ -90,6 +110,47 @@ function rowToMessage(row: any): Message {
     body: row.body,
     ts: row.ts,
     readAt: row.read_at ?? undefined,
+  }
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: raw better-sqlite3 rows
+function rowToWorkflow(row: any): WorkflowInstance {
+  return {
+    id: row.id,
+    kind: row.kind,
+    status: row.status as WorkflowStatus,
+    project: row.project ?? undefined,
+    title: row.title,
+    input: JSON.parse(row.input),
+    state: JSON.parse(row.state),
+    currentStep: row.current_step ?? undefined,
+    wakeAt: row.wake_at ?? undefined,
+    waitEvent: row.wait_event ?? undefined,
+    error: row.error ?? undefined,
+    createdAt: row.created_at,
+    startedAt: row.started_at ?? undefined,
+    endedAt: row.ended_at ?? undefined,
+    updatedAt: row.updated_at,
+  }
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: raw better-sqlite3 rows
+function rowToWorkflowStep(row: any): WorkflowStep {
+  return {
+    id: row.id,
+    workflowId: row.workflow_id,
+    name: row.name,
+    seq: row.seq,
+    status: row.status as WorkflowStepStatus,
+    attempt: row.attempt,
+    runId: row.run_id ?? undefined,
+    output:
+      row.output !== null && row.output !== undefined
+        ? JSON.parse(row.output)
+        : undefined,
+    error: row.error ?? undefined,
+    startedAt: row.started_at,
+    endedAt: row.ended_at ?? undefined,
   }
 }
 
@@ -455,6 +516,159 @@ export class EventLog {
     this.db
       .prepare('UPDATE schedules SET fired_at = ? WHERE id = ?')
       .run(firedAtIso, id)
+  }
+
+  createWorkflow(w: {
+    kind: string
+    project?: string
+    title: string
+    input: Record<string, unknown>
+  }): WorkflowInstance {
+    const id = genId()
+    // created_at/updated_at are set explicitly from this module's monotonic
+    // nowIso() rather than left to schema.sql's SQL-side strftime() default:
+    // that default is a separate clock read from JS's Date.now(), and the
+    // two can tie at millisecond resolution on fast in-memory SQLite,
+    // making a subsequent updateWorkflow()'s new updatedAt indistinguishable
+    // from this row's initial one.
+    const now = nowIso()
+    this.db
+      .prepare(
+        `INSERT INTO workflows (id, kind, status, project, title, input, state, created_at, updated_at)
+         VALUES (?, ?, 'queued', ?, ?, ?, '{}', ?, ?)`,
+      )
+      .run(
+        id,
+        w.kind,
+        w.project ?? null,
+        w.title,
+        JSON.stringify(w.input),
+        now,
+        now,
+      )
+    // biome-ignore lint/style/noNonNullAssertion: just inserted
+    return this.getWorkflow(id)!
+  }
+
+  getWorkflow(id: string): WorkflowInstance | undefined {
+    const row = this.db.prepare('SELECT * FROM workflows WHERE id = ?').get(id)
+    return row ? rowToWorkflow(row) : undefined
+  }
+
+  listWorkflows(
+    opts: { status?: WorkflowStatus; kind?: string; project?: string } = {},
+  ): WorkflowInstance[] {
+    let sql = 'SELECT * FROM workflows WHERE 1=1'
+    const params: unknown[] = []
+    if (opts.status) {
+      sql += ' AND status = ?'
+      params.push(opts.status)
+    }
+    if (opts.kind) {
+      sql += ' AND kind = ?'
+      params.push(opts.kind)
+    }
+    if (opts.project) {
+      sql += ' AND project = ?'
+      params.push(opts.project)
+    }
+    sql += ' ORDER BY created_at DESC'
+    return this.db
+      .prepare(sql)
+      .all(...params)
+      .map(rowToWorkflow)
+  }
+
+  updateWorkflow(
+    id: string,
+    patch: Partial<WorkflowInstance>,
+  ): WorkflowInstance {
+    const existing = this.getWorkflow(id)
+    if (!existing) throw new Error(`Workflow not found: ${id}`)
+    const merged: WorkflowInstance = {
+      ...existing,
+      ...patch,
+      updatedAt: nowIso(),
+    }
+    this.db
+      .prepare(
+        `UPDATE workflows SET kind=@kind, status=@status, project=@project, title=@title, input=@input, state=@state,
+         current_step=@currentStep, wake_at=@wakeAt, wait_event=@waitEvent, error=@error,
+         started_at=@startedAt, ended_at=@endedAt, updated_at=@updatedAt WHERE id=@id`,
+      )
+      .run({
+        id,
+        kind: merged.kind,
+        status: merged.status,
+        project: merged.project ?? null,
+        title: merged.title,
+        input: JSON.stringify(merged.input),
+        state: JSON.stringify(merged.state),
+        currentStep: merged.currentStep ?? null,
+        wakeAt: merged.wakeAt ?? null,
+        waitEvent: merged.waitEvent ?? null,
+        error: merged.error ?? null,
+        startedAt: merged.startedAt ?? null,
+        endedAt: merged.endedAt ?? null,
+        updatedAt: merged.updatedAt,
+      })
+    // biome-ignore lint/style/noNonNullAssertion: just updated
+    return this.getWorkflow(id)!
+  }
+
+  createWorkflowStep(s: {
+    workflowId: string
+    name: string
+    seq: number
+    status: WorkflowStepStatus
+    attempt?: number
+  }): WorkflowStep {
+    const id = genId()
+    this.db
+      .prepare(
+        'INSERT INTO workflow_steps (id, workflow_id, name, seq, status, attempt) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(id, s.workflowId, s.name, s.seq, s.status, s.attempt ?? 1)
+    // biome-ignore lint/style/noNonNullAssertion: just inserted
+    return this.listWorkflowSteps(s.workflowId).find((row) => row.id === id)!
+  }
+
+  listWorkflowSteps(workflowId: string): WorkflowStep[] {
+    return this.db
+      .prepare(
+        'SELECT * FROM workflow_steps WHERE workflow_id = ? ORDER BY seq ASC',
+      )
+      .all(workflowId)
+      .map(rowToWorkflowStep)
+  }
+
+  updateWorkflowStep(id: string, patch: Partial<WorkflowStep>): WorkflowStep {
+    const row = this.db
+      .prepare('SELECT * FROM workflow_steps WHERE id = ?')
+      .get(id)
+    if (!row) throw new Error(`Workflow step not found: ${id}`)
+    const existing = rowToWorkflowStep(row)
+    const merged: WorkflowStep = { ...existing, ...patch }
+    this.db
+      .prepare(
+        'UPDATE workflow_steps SET status=@status, attempt=@attempt, run_id=@runId, output=@output, error=@error, ended_at=@endedAt WHERE id=@id',
+      )
+      .run({
+        id,
+        status: merged.status,
+        attempt: merged.attempt,
+        runId: merged.runId ?? null,
+        output:
+          merged.output !== undefined ? JSON.stringify(merged.output) : null,
+        error: merged.error ?? null,
+        endedAt: merged.endedAt ?? null,
+      })
+    // biome-ignore lint/style/noNonNullAssertion: just updated
+    return this.listWorkflowSteps(merged.workflowId).find((r) => r.id === id)!
+  }
+
+  deleteWorkflowStep(id: string): void {
+    this.db.prepare('DELETE FROM workflow_steps WHERE id = ?').run(id)
   }
 
   close(): void {

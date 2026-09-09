@@ -3,6 +3,11 @@
 // syscall as their routes land — see "Contract additions" in
 // docs/superpowers/plans/2026-09-08-agent-os-m1-kernel-core.md.
 import type { RunStatus } from './run.js'
+import type {
+  WorkflowInstance,
+  WorkflowStatus,
+  WorkflowStep,
+} from './workflow.js'
 
 export interface HealthResponse {
   ok: true
@@ -35,4 +40,31 @@ export interface CreateRunResponse {
 
 export interface KillRunResponse {
   ok: boolean
+}
+
+export interface CreateWorkflowRequest {
+  kind: string
+  project?: string
+  title?: string
+  input: Record<string, unknown>
+}
+
+export interface CreateWorkflowResponse {
+  workflowId: string
+}
+
+export interface GetWorkflowResponse {
+  workflow: WorkflowInstance
+  steps: WorkflowStep[]
+}
+
+export interface ListWorkflowsQuery {
+  status?: WorkflowStatus
+  project?: string
+  kind?: string
+}
+
+export interface DeliverWorkflowEventRequest {
+  type: string
+  payload?: Record<string, unknown>
 }
