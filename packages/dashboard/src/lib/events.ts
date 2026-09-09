@@ -18,6 +18,7 @@ export function classifyEvent(type: string): EventKind {
   if (type === 'run.failed' || type === 'ops.alert') return 'alert'
   if (type === 'security.redacted') return 'alert'
   if (type.startsWith('run.')) return 'run'
+  if (type.startsWith('workflow.')) return 'run'
   if (type.startsWith('decision.')) return 'human'
   if (type.startsWith('git.')) return 'git'
   return 'memory'
@@ -69,6 +70,26 @@ export function describeEvent(e: Event): string {
       return `Alert: ${str(p.message) ?? str(p.reason) ?? 'see run'}`
     case 'security.redacted':
       return 'A secret was redacted before it reached memory'
+    case 'workflow.created':
+      return `Request started: ${str(p.title) ?? str(p.kind) ?? 'a feature request'}`
+    case 'workflow.step.started':
+      return `${str(p.step) ?? 'a step'} started`
+    case 'workflow.step.succeeded':
+      return `${str(p.step) ?? 'a step'} finished`
+    case 'workflow.step.failed':
+      return `${str(p.step) ?? 'a step'} failed`
+    case 'workflow.waiting':
+      return `Waiting on ${str(p.step) ?? 'an event'}`
+    case 'workflow.resumed':
+      return 'Request resumed'
+    case 'workflow.paused':
+      return 'Request paused'
+    case 'workflow.succeeded':
+      return 'Request completed'
+    case 'workflow.failed':
+      return `Request failed${str(p.step) ? ` at ${str(p.step)}` : ''}`
+    case 'workflow.terminated':
+      return 'Request terminated'
     default:
       return e.type.replace('.', ' ')
   }

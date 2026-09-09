@@ -48,7 +48,7 @@ function costFromValue(value: unknown): number {
  * §3.1). Works from the list endpoint alone — no per-instance steps fetch.
  */
 export function workflowCostUsd(workflow: WorkflowInstance): number {
-  return Object.values(workflow.state ?? {}).reduce(
+  return Object.values(workflow.state ?? {}).reduce<number>(
     (sum, v) => sum + costFromValue(v),
     0,
   )
