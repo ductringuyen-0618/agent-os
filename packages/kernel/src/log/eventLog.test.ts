@@ -97,4 +97,22 @@ describe('EventLog', () => {
     expect(inbox).toHaveLength(1)
     expect(inbox[0].body).toBe('hello')
   })
+
+  it('emits a message.sent event when a message is sent', () => {
+    const seen: string[] = []
+    const unsubscribe = log.subscribe((e) => seen.push(e.type))
+    const m = log.sendMessage({ from: 'ops', to: 'librarian', body: 'hi' })
+    unsubscribe()
+    expect(seen).toEqual(['message.sent'])
+    const [event] = log.listEvents({ types: ['message.sent'] })
+    expect(event.payload).toEqual({ id: m.id, from: 'ops', to: 'librarian' })
+  })
+
+  it('lists all messages newest first without marking them read', () => {
+    log.sendMessage({ from: 'ops', to: 'librarian', body: 'first' })
+    log.sendMessage({ from: 'librarian', to: 'ops', body: 'second' })
+    const messages = log.listMessages()
+    expect(messages.map((m) => m.body)).toEqual(['second', 'first'])
+    expect(messages.every((m) => m.readAt === undefined)).toBe(true)
+  })
 })

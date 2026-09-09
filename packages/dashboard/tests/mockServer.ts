@@ -1,6 +1,7 @@
 import type {
   Decision,
   Event,
+  Message,
   RoutineConfig,
   Run,
   SkillMeta,
@@ -37,6 +38,13 @@ export const fixtures = {
     hasLearnings: true,
     lastScore: 0.9,
   } satisfies SkillMeta,
+  message: {
+    id: 'msg_1',
+    from: 'ops',
+    to: 'librarian',
+    body: 'wiki looks stale, can you re-sync?',
+    ts: '2026-09-08T00:00:00Z',
+  } satisfies Message,
 }
 
 type Handler = (url: URL, init?: RequestInit) => unknown
@@ -79,6 +87,7 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
     'GET /api/costs': () => [
       { day: '2026-09-08', agent: 'ops', costUsd: 0.42 },
     ],
+    'GET /api/messages': () => [fixtures.message],
     ...overrides,
   }
   vi.stubGlobal(

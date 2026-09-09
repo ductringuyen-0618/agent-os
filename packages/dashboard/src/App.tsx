@@ -3,6 +3,7 @@ import { Icon, type IconName } from './components/Icon'
 import { ToastProvider } from './components/Toast'
 import { CostsPanel } from './panels/CostsPanel'
 import { DecisionsPanel } from './panels/DecisionsPanel'
+import { MessagesPanel } from './panels/MessagesPanel'
 import { OverviewPanel } from './panels/OverviewPanel'
 import { RoutinesPanel } from './panels/RoutinesPanel'
 import { RunsPanel } from './panels/RunsPanel'
@@ -17,6 +18,7 @@ export type PanelName =
   | 'skills'
   | 'routines'
   | 'costs'
+  | 'messages'
 
 const NAV: Array<{ id: PanelName; label: string; icon: IconName }> = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
@@ -26,6 +28,7 @@ const NAV: Array<{ id: PanelName; label: string; icon: IconName }> = [
   { id: 'skills', label: 'Skills', icon: 'skills' },
   { id: 'routines', label: 'Routines', icon: 'routines' },
   { id: 'costs', label: 'Costs', icon: 'costs' },
+  { id: 'messages', label: 'Messages', icon: 'messages' },
 ]
 
 function isTyping(target: EventTarget | null) {
@@ -73,6 +76,9 @@ export default function App() {
       break
     case 'costs':
       panel = <CostsPanel />
+      break
+    case 'messages':
+      panel = <MessagesPanel />
       break
     default:
       panel = <OverviewPanel onNavigate={go} />
@@ -124,7 +130,7 @@ export default function App() {
             })}
           </ul>
           <div className="mt-auto px-4 py-3 text-[11px] text-muted/70">
-            Press 1–7 to switch panels
+            Press 1–{NAV.length} to switch panels
           </div>
         </nav>
         <main className="flex-1 overflow-auto p-6">

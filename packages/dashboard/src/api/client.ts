@@ -3,6 +3,7 @@ import type {
   DecisionStatus,
   EvalCriteria,
   Event,
+  Message,
   RoutineConfig,
   Run,
   RunStatus,
@@ -155,6 +156,12 @@ export class ApiClient {
     return this.req<CostEntry[]>(
       'GET',
       `/api/costs${days ? `?days=${days}` : ''}`,
+    )
+  }
+  messages(limit?: number) {
+    return this.req<Message[]>(
+      'GET',
+      `/api/messages${limit ? `?limit=${limit}` : ''}`,
     )
   }
 }

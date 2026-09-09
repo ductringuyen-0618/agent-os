@@ -358,6 +358,10 @@ export class EventLog {
         'INSERT INTO messages (id, from_agent, to_agent, body, ts, read_at) VALUES (?, ?, ?, ?, ?, NULL)',
       )
       .run(id, m.from, m.to, m.body, ts)
+    this.append({
+      type: 'message.sent',
+      payload: { id, from: m.from, to: m.to },
+    })
     return { id, from: m.from, to: m.to, body: m.body, ts }
   }
 
@@ -374,6 +378,19 @@ export class EventLog {
         .run(nowIso(), agent)
     }
     return messages
+  }
+
+  /**
+   * All messages, newest first, for operator viewing -- never marks anything
+   * read. Ties on `ts` (same-millisecond sends) break on rowid, SQLite's
+   * implicit insertion-order column, so results are stable rather than
+   * depending on clock resolution.
+   */
+  listMessages(limit = 100): Message[] {
+    const rows = this.db
+      .prepare('SELECT * FROM messages ORDER BY ts DESC, rowid DESC LIMIT ?')
+      .all(limit)
+    return rows.map(rowToMessage)
   }
 
   createRunToken(runId: string, token: string): void {
