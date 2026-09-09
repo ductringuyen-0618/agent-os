@@ -18,9 +18,18 @@ interface LoadedRoutine {
   everyMs?: number
   nextRunAt?: Date
   missedAlerted?: boolean
+  // Tracks whether the previous every:-interval fire's execution has
+  // settled. checkMissedRoutines compares `now` against `nextRunAt`, so
+  // nextRunAt must stay fixed at the last *expected* fire time while a run
+  // is stuck -- if it were refreshed unconditionally on every timer tick
+  // (as croner-style "every" scheduling naively would), a hung exec would
+  // never be flagged as missed because nextRunAt would always trail ~1
+  // interval behind "now".
+  inFlight?: boolean
 }
 
 const TICK_MS = 15_000
+const MIN_GRACE_MS = 60_000
 
 export class Scheduler {
   private routines = new Map<string, LoadedRoutine>()
@@ -81,8 +90,13 @@ export class Scheduler {
       lr.everyMs = parseEvery(config.every)
       lr.nextRunAt = new Date(Date.now() + lr.everyMs)
       lr.intervalHandle = setInterval(() => {
-        lr.nextRunAt = new Date(Date.now() + (lr.everyMs as number))
-        lr.missedAlerted = false
+        // Only advance the expected-fire clock once the previous fire's
+        // execution has actually settled -- see the LoadedRoutine.inFlight
+        // doc comment.
+        if (!lr.inFlight) {
+          lr.nextRunAt = new Date(Date.now() + (lr.everyMs as number))
+          lr.missedAlerted = false
+        }
         this.trigger(lr)
       }, lr.everyMs)
     }
@@ -91,7 +105,24 @@ export class Scheduler {
   private trigger(lr: LoadedRoutine): void {
     if (!lr.enabled) return
     if (lr.config.after && !this.afterOk(lr.config.after)) return
-    this.runRoutine(lr.config).catch(() => {})
+    if (lr.everyMs === undefined) {
+      this.runRoutine(lr.config).catch(() => {})
+      return
+    }
+    lr.inFlight = true
+    this.runTrackedEveryRoutine(lr).finally(() => {
+      lr.inFlight = false
+    })
+  }
+
+  private async runTrackedEveryRoutine(lr: LoadedRoutine): Promise<void> {
+    const run = this.log.createRun({
+      routine: lr.config.name,
+      skill: lr.config.skill,
+      adapter: lr.config.adapter,
+      agent: lr.config.agent,
+    })
+    await this.executeRoutine(run, lr.config, undefined).catch(() => {})
   }
 
   private afterOk(after: string[]): boolean {
@@ -231,7 +262,24 @@ export class Scheduler {
     this.processDueSchedules()
     this.checkMissedRoutines() // filled in Task 5
   }
-  private checkMissedRoutines(): void {}
+  private checkMissedRoutines(): void {
+    const now = Date.now()
+    for (const lr of this.routines.values()) {
+      if (!lr.enabled || !lr.everyMs || !lr.nextRunAt) continue
+      const grace = Math.max(MIN_GRACE_MS, lr.everyMs * 0.5)
+      if (now > lr.nextRunAt.getTime() + grace && !lr.missedAlerted) {
+        lr.missedAlerted = true
+        this.log.append({
+          type: 'ops.alert',
+          payload: {
+            routine: lr.config.name,
+            reason: 'missed',
+            expectedAt: lr.nextRunAt.toISOString(),
+          },
+        })
+      }
+    }
+  }
   private recoverFromRestart(): void {}
   setEnabled(_name: string, _enabled: boolean): void {
     throw new Error('not implemented until Task 6')
