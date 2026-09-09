@@ -26,9 +26,14 @@ export class AdapterHost {
   ) {}
 
   private expand(value: string): string {
-    return value
+    const expanded = value
       .replaceAll('${AGENTOS_HOME}', this.cfg.osRoot)
       .replaceAll('${AGENTOS_CLONES}', path.join(this.cfg.runtimeDir, 'clones'))
+    // Variable expansion mixes native separators (from path.join above) with
+    // the '/' literals from the YAML source, e.g. 'C:\...\clones/techpulse'
+    // on Windows. Normalize once here, the single point where path-valued
+    // fields are produced, so every caller gets a platform-native path.
+    return path.normalize(expanded)
   }
 
   async loadProjects(): Promise<ProjectConfig[]> {
