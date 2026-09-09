@@ -14,6 +14,7 @@ import fastifyWebsocket from '@fastify/websocket'
 import Fastify, { type FastifyInstance } from 'fastify'
 import type { Kernel } from '../kernel.js'
 import { assemblePrompt } from '../process/promptAssembler.js'
+import { registerInternalRoutes } from './internal.js'
 
 const VERSION = '0.1.0'
 
@@ -62,7 +63,7 @@ function findRoutineForSkill(
 }
 
 export function buildServer(kernel: Kernel): FastifyInstance {
-  const { cfg, log, pm } = kernel
+  const { cfg, log, pm, wiki, scheduler } = kernel
   const app = Fastify({ logger: { level: cfg.logLevel } })
   app.register(fastifyWebsocket)
 
@@ -79,6 +80,8 @@ export function buildServer(kernel: Kernel): FastifyInstance {
     '/api/health',
     async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }),
   )
+
+  registerInternalRoutes(app, { log, wiki, scheduler, osRoot: cfg.osRoot })
 
   app.get('/api/runs', async (req) => {
     const q = req.query as { status?: string; routine?: string; limit?: string }
