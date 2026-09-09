@@ -5,6 +5,20 @@ branch: null
 ---
 # Surface the agent-to-agent mailbox in the API and dashboard
 
+## What you get
+A Messages panel in the dashboard and a `GET /api/messages` route, so every
+note one agent sends another (`send_message` / `read_inbox`) is visible: who
+sent it, to whom, when, and whether it was read. Each send also emits a
+`message.sent` event, so it shows in the live activity feed and the pulse strip.
+
+## Why start this now
+Agent-to-agent messaging already works in the kernel, but it is the one
+channel the operator cannot see. If `ops` tells `librarian` something today,
+the only way to know is to open the SQLite file. As more routines and agents are
+added, coordination you cannot observe is coordination you cannot debug or trust.
+The messages table, both syscalls and the event type already exist, so this is a
+small change that closes a real blind spot in the command centre.
+
 ## Problem / opportunity
 `send_message`/`read_inbox` are two of the eight syscalls in
 `docs/SECURITY.md`'s "what an agent can do" list, and

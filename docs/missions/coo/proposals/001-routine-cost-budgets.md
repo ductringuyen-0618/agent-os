@@ -5,6 +5,21 @@ branch: null
 ---
 # Per-routine daily cost budgets with a circuit breaker
 
+## What you get
+A `daily_budget_usd` setting, global and per routine, that the scheduler checks
+before every run. When a routine has already spent its cap today, the run is
+skipped, one `ops.alert` event explains why (routine, cap, spent), and the
+Routines panel shows a "budget tripped" chip next to it. The cap resets by
+itself at UTC midnight; nothing to clear by hand.
+
+## Why start this now
+Today the only cost control is looking at the Costs chart after the money is
+gone. One routine on a tight interval, or one skill whose prompt grows with the
+wiki, can spend all day unattended. The heartbeat already costs about $0.34 per
+run with nothing to stop it. This is the same kind of gap `max_attempts` closes
+for failures, and it is small: one query, one guard clause, one chip. Every day
+without it is a day the daemon can surprise you on the bill.
+
 ## Problem / opportunity
 `packages/kernel`'s `Scheduler` already tracks per-run cost (`Run.costUsd`,
 persisted in SQLite and shown in the dashboard's **Costs** panel), and it
