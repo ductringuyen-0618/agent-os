@@ -29,7 +29,7 @@ Two deliberate design choices, because the spec describes step *outcomes* in pro
 
 ## Coordination notes (resolved by team-lead ruling before this task list was finalized)
 - **W1** (`docs/superpowers/plans/2026-09-09-feature-requests-w1-workflow-engine.md`): owns and this plan *consumes without redefining* — `WorkflowDefinition<I>`, `WorkflowContext<I>` (with `readonly id: string`), `WorkflowStepApi`, `StepOptions`, `StepRunSpec` (`packages/kernel/src/workflow/types.ts`); `RunResult` (`packages/kernel/src/process/processManager.ts`, pre-existing from M2); `FeatureRequestInput` lives in **W1's** `packages/shared/src/types/workflow.ts` (this plan's Task 1 appends it there); `CreateWorkflowRequest`/`CreateWorkflowResponse` (`packages/shared/src/types/api.ts`) and `ApiClient.createWorkflow`/`registerWorkflowsCommand` (`packages/cli`) are also W1's (its Task 11) — Task 8 below reuses them, it does not redefine them. `createKernel(cfg, adapterRegistry, workflowDefinitions)`'s third parameter (an array of `WorkflowDefinition[]`, registered inside `KernelImpl`'s constructor) is the exact seam this plan's Task 5 plugs into, via `up.ts` — not `kernel.ts`, see Architecture.
-- **W1**: wherever the engine turns a `StepRunSpec` into a `ProcessManager` `SpawnSpec`, it must call `assertCloneCwdAllowed` (Task 2) before spawning any step whose `StepRunSpec.cwd` is set, passing the step's resolved `ProjectConfig`. Already sent as a heads-up message; this plan's own tasks build and test the guard function itself so W3 isn't blocked waiting for that wiring, and it is not this plan's place to edit W1's engine internals to call it.
+- **W1**: `WorkflowRuntimeDeps` gains an optional `cwdPolicy?: (cwd: string, spec: StepRunSpec, input: unknown) => void` (team-lead ruling), which the engine calls before spawning any `step.run` whose resolved `cwd` is outside `agents/<agent>/workspace`. This plan supplies that function (`createFeatureRequestCwdPolicy`, Task 5, built from `assertCloneCwdAllowed` + `AdapterHost.getCachedProjects()`, both Task 2) when wiring the definition into `createKernel` in `up.ts`. The exact 4th-parameter shape of `createKernel(cfg, adapterRegistry, workflowDefinitions, cwdPolicy)` is this plan's best-effort guess at W1's real signature — adjust Task 5 Step 8's `up.ts` call to match once W1's actual wiring point lands; `assertCloneCwdAllowed` and `createFeatureRequestCwdPolicy` themselves need no change regardless of how the engine ends up invoking them.
 - **W2** (`docs/superpowers/plans/2026-09-09-feature-requests-w2-github-projects.md`): owns `ProjectBuildConfig` (not `BuildConfig` — team-lead ruling) and `ProjectConfig.build?: ProjectBuildConfig` in `packages/shared/src/types/project.ts`, plus `ProjectBuildConfigSchema` in `packages/shared/src/schemas.ts`. This plan only *consumes* `ProjectBuildConfig` (Task 5) — no shared-types task of its own adds or redefines it.
 
 ## File structure
@@ -40,13 +40,14 @@ Two deliberate design choices, because the spec describes step *outcomes* in pro
 | `packages/kernel/src/workflow/slug.ts` | `slugify(title): string` |
 | `packages/kernel/src/workflow/buildContainment.ts` | `assertCloneCwdAllowed`, `CwdNotAllowedError` |
 | `packages/kernel/src/log/eventLog.ts` | *Modify*: `resolveDecision` appends a `decision.resolved` event |
+| `packages/kernel/src/adapters/adapterHost.ts` | *Modify*: `AdapterHost.getCachedProjects()` (sync cache, needed by `cwdPolicy`) |
 | `packages/kernel/src/adapters/types.ts` | *Modify*: `FeatureRequestAdapterOps` and its I/O types; `ProjectAdapter.featureRequests?` |
 | `packages/kernel/package.json` / `scripts/postbuild.mjs` | *Modify*: `./wiki/redact` export subpath; `@agentos/adapters` devDependency |
 | `packages/adapters/src/techpulseCoo/adapter.ts` | *Modify*: export `ensureClone`; wire `featureRequests` |
 | `packages/adapters/src/techpulseCoo/requests.ts` | `bootstrapCooLayout`, `pushProposal`, `openPullRequest`, `markShipped`, `writeReport` |
-| `packages/kernel/src/workflow/definitions/featureRequest.ts` | `createFeatureRequestWorkflow`, `FeatureRequestDeps`, `FeatureRequestKernelDeps` |
+| `packages/kernel/src/workflow/definitions/featureRequest.ts` | `createFeatureRequestWorkflow`, `createFeatureRequestCwdPolicy`, `FeatureRequestDeps`, `FeatureRequestKernelDeps` |
 | `packages/kernel/src/index.ts` | *Modify*: re-export `./workflow/definitions/featureRequest.js` |
-| `packages/cli/src/commands/up.ts` | *Modify*: build and pass `createFeatureRequestWorkflow(...)` into `createKernel`'s third parameter |
+| `packages/cli/src/commands/up.ts` | *Modify*: build and pass `createFeatureRequestWorkflow(...)` and `createFeatureRequestCwdPolicy(...)` into `createKernel`'s 3rd/4th parameters |
 | `examples/os-template/os/skills/feature-brief/{skill.md,learnings.md,eval.json,context/handoff.md}` | feature-brief skill |
 | `examples/os-template/os/skills/feature-build/{...}` | feature-build skill |
 | `examples/os-template/os/skills/feature-validate/{...}` | feature-validate skill |
@@ -120,10 +121,10 @@ EOF
 )"
 ```
 
-## Task 2: Kernel workflow support — `slugify`, build-cwd containment, `decision.resolved` event
+## Task 2: Kernel workflow support — `slugify`, build-cwd containment, cached projects, `decision.resolved` event
 
-**Files:** Create: `packages/kernel/src/workflow/slug.ts`, `packages/kernel/src/workflow/slug.test.ts`, `packages/kernel/src/workflow/buildContainment.ts`, `packages/kernel/src/workflow/buildContainment.test.ts`. Modify: `packages/kernel/src/log/eventLog.ts`. Test: `packages/kernel/src/log/eventLog.decisionResolved.test.ts`.
-**Interfaces:** Produces: `slugify(title): string`, `assertCloneCwdAllowed(input)`, `CwdNotAllowedError` — consumed by Task 5. `EventLog.resolveDecision` gains a side effect (appends `decision.resolved`) consumed by Task 5's `await-approval` step and, going forward, by the dashboard's decision-approve flow.
+**Files:** Create: `packages/kernel/src/workflow/slug.ts`, `packages/kernel/src/workflow/slug.test.ts`, `packages/kernel/src/workflow/buildContainment.ts`, `packages/kernel/src/workflow/buildContainment.test.ts`, `packages/kernel/src/adapters/adapterHost.cachedProjects.test.ts`. Modify: `packages/kernel/src/log/eventLog.ts`, `packages/kernel/src/adapters/adapterHost.ts`. Test: `packages/kernel/src/log/eventLog.decisionResolved.test.ts`.
+**Interfaces:** Produces: `slugify(title): string`, `assertCloneCwdAllowed(input)`, `CwdNotAllowedError`, `AdapterHost.getCachedProjects(): ProjectConfig[]` — all consumed by Task 5's `createFeatureRequestCwdPolicy`. `EventLog.resolveDecision` gains a side effect (appends `decision.resolved`) consumed by Task 5's `await-approval` step and, going forward, by the dashboard's decision-approve flow.
 
 This task fixes a real, pre-existing gap: `'decision.resolved'` has been a valid `EventType` since M1 (contract §3), but no code path (`api/server.ts`'s approve/reject route, `adapter.ts`'s `applyDecision`) actually appends that event — only the DB row's `status` column changes. Without this fix, `step.waitForEvent('decision.resolved', ...)` in Task 5 would time out on every real approval. Fixing it once inside `EventLog.resolveDecision` (the single choke point both callers already go through) covers every caller, not just this workflow's.
 
@@ -293,8 +294,10 @@ export class CwdNotAllowedError extends Error {}
  * cwd may only be outside its agent's normal `agents/<agent>/workspace`
  * when the workflow's project has `build.enabled: true`, and even then it
  * must be exactly that project's clone directory -- never an arbitrary
- * path. The workflow engine's StepRunSpec -> SpawnSpec translation (W1)
- * must call this before every spawn where `spec.cwd` is set.
+ * path. Wrapped by Task 5's `createFeatureRequestCwdPolicy`, which the
+ * workflow engine calls as `WorkflowRuntimeDeps.cwdPolicy` before every
+ * spawn where `spec.cwd` is set (W1, per team-lead ruling) -- this
+ * function itself is engine-agnostic and has no dependency on that hook.
  */
 export function assertCloneCwdAllowed(input: AssertCloneCwdAllowedInput): void {
   const workspace = path.resolve(input.osRoot, 'agents', input.agent, 'workspace')
@@ -410,17 +413,118 @@ resolveDecision(
   `pnpm --filter @agentos/kernel test -- src/log/eventLog.decisionResolved.test.ts src/log/eventLog.runtoken.test.ts`
   (also re-run the full kernel suite once: `pnpm --filter @agentos/kernel test` — `decisions.test.ts`/`server.ts` decision-route tests must still pass now that an extra event is appended on every resolution.)
 
-- [ ] **Step 13: commit**
+- [ ] **Step 13: failing test for `AdapterHost.getCachedProjects`**
+
+The engine's `cwdPolicy` hook (see Coordination notes) is synchronous — `(cwd, spec, input) => void`, no `Promise` — but resolving a project by name normally means `await AdapterHost.loadProjects()` (it re-reads `os/projects/*.yaml` from disk every call). `getCachedProjects()` gives Task 5's policy function a synchronous read of the *last* `loadProjects()` result; `featureRequest.ts`'s `run()` always calls `loadProjects()` itself before any `step.run` that could need this cache, so it is never stale for a cwd check made during that same instance's execution.
+
+```ts
+// packages/kernel/src/adapters/adapterHost.cachedProjects.test.ts
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { describe, expect, it } from 'vitest'
+import type { KernelConfig } from '../config.js'
+import { AdapterHost } from './adapterHost.js'
+
+function makeCfg(osRoot: string): KernelConfig {
+  return {
+    osRoot,
+    runtimeDir: path.join(osRoot, '..', '.agentos'),
+    dbPath: ':memory:',
+    claudeBin: 'true',
+    host: '127.0.0.1',
+    port: 0,
+    logLevel: 'info',
+  }
+}
+
+describe('AdapterHost.getCachedProjects', () => {
+  it('is empty before loadProjects has ever been called', () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    // biome-ignore lint/suspicious/noExplicitAny: minimal structural stubs for EventLog/WikiService, unused here
+    const host = new AdapterHost(makeCfg(osRoot), {} as any, {} as any, {})
+    expect(host.getCachedProjects()).toEqual([])
+  })
+
+  it('reflects the result of the most recent loadProjects call', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    mkdirSync(path.join(osRoot, 'projects'), { recursive: true })
+    writeFileSync(
+      path.join(osRoot, 'projects', 'techpulse.yaml'),
+      'name: techpulse\nadapter: techpulse-coo\nrepo: https://example.com/x.git\nclone: ${AGENTOS_CLONES}/techpulse\nbase_branch: main\noptions:\n  proposals_path: docs/missions/coo/proposals\n  state_path: docs/missions/coo/state.md\n  reports_path: docs/missions/coo/reports\n',
+    )
+    // biome-ignore lint/suspicious/noExplicitAny: minimal structural stubs for EventLog/WikiService, unused here
+    const host = new AdapterHost(makeCfg(osRoot), {} as any, {} as any, {})
+
+    expect(host.getCachedProjects()).toEqual([])
+    const loaded = await host.loadProjects()
+    expect(host.getCachedProjects()).toEqual(loaded)
+    expect(host.getCachedProjects()[0].name).toBe('techpulse')
+  })
+})
 ```
-git add packages/kernel/src/workflow/slug.ts packages/kernel/src/workflow/slug.test.ts packages/kernel/src/workflow/buildContainment.ts packages/kernel/src/workflow/buildContainment.test.ts packages/kernel/src/log/eventLog.ts packages/kernel/src/log/eventLog.decisionResolved.test.ts
+
+- [ ] **Step 14: run it, expect failure**
+  `pnpm --filter @agentos/kernel test -- src/adapters/adapterHost.cachedProjects.test.ts`
+  Expected: fails — `getCachedProjects` is not a function on `AdapterHost`.
+
+- [ ] **Step 15: implementation — modify `packages/kernel/src/adapters/adapterHost.ts`**
+
+```ts
+// packages/kernel/src/adapters/adapterHost.ts — add a private field to the class
+private cachedProjects: ProjectConfig[] = []
+
+// packages/kernel/src/adapters/adapterHost.ts — replace the existing loadProjects method
+async loadProjects(): Promise<ProjectConfig[]> {
+  const dir = path.join(this.cfg.osRoot, 'projects')
+  const files = await readdir(dir).catch(() => null)
+  if (!files) {
+    this.cachedProjects = []
+    return []
+  }
+  const projects: ProjectConfig[] = []
+  for (const file of files.filter(
+    (f) => f.endsWith('.yaml') || f.endsWith('.yml'),
+  )) {
+    const raw = await readFile(path.join(dir, file), 'utf8')
+    const parsed = parseYaml(raw) as Record<string, unknown>
+    const expanded = {
+      ...parsed,
+      clone:
+        typeof parsed.clone === 'string'
+          ? this.expand(parsed.clone)
+          : parsed.clone,
+    }
+    projects.push(ProjectConfigSchema.parse(expanded))
+  }
+  this.cachedProjects = projects
+  return projects
+}
+
+// packages/kernel/src/adapters/adapterHost.ts — add a new public method, alongside loadProjects
+/** Synchronous read of the last successfully loaded project list -- see this task's test file for why this exists. */
+getCachedProjects(): ProjectConfig[] {
+  return this.cachedProjects
+}
+```
+
+- [ ] **Step 16: run tests, expect PASS**
+  `pnpm --filter @agentos/kernel test -- src/adapters/adapterHost.cachedProjects.test.ts src/adapters/adapterHost.test.ts`
+
+- [ ] **Step 17: commit**
+```
+git add packages/kernel/src/workflow/slug.ts packages/kernel/src/workflow/slug.test.ts packages/kernel/src/workflow/buildContainment.ts packages/kernel/src/workflow/buildContainment.test.ts packages/kernel/src/log/eventLog.ts packages/kernel/src/log/eventLog.decisionResolved.test.ts packages/kernel/src/adapters/adapterHost.ts packages/kernel/src/adapters/adapterHost.cachedProjects.test.ts
 git commit -m "$(cat <<'EOF'
-feat(kernel): add slugify/build-cwd containment, emit decision.resolved
+feat(kernel): add slugify/build-cwd containment/cached projects, emit decision.resolved
 
 slugify and assertCloneCwdAllowed are workflow-engine building blocks
-for the feature-request workflow (spec §5.2/§5.3). EventLog.resolveDecision
-now appends a decision.resolved event on every resolution (approve,
-reject, or adapter error) -- previously no code path emitted it despite
-being a documented EventType since M1, which would have made
+for the feature-request workflow (spec §5.2/§5.3). AdapterHost now caches
+its last loadProjects() result synchronously (getCachedProjects), needed
+because the workflow engine's cwdPolicy hook is synchronous and cannot
+await a fresh project lookup at spawn time. EventLog.resolveDecision now
+appends a decision.resolved event on every resolution (approve, reject,
+or adapter error) -- previously no code path emitted it despite being a
+documented EventType since M1, which would have made
 step.waitForEvent('decision.resolved') time out on every real approval.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
@@ -1241,7 +1345,7 @@ EOF
 ## Task 5: `featureRequest.ts` workflow definition
 
 **Files:** Create: `packages/kernel/src/workflow/definitions/featureRequest.ts`, `packages/kernel/src/workflow/definitions/featureRequest.test.ts`. Modify: `packages/kernel/package.json` (devDependency), `packages/kernel/src/index.ts`, `packages/cli/src/commands/up.ts`.
-**Interfaces:** Consumes (imported, never redefined): `WorkflowDefinition<I>`, `WorkflowContext<I>` (`.id: string`, `.input`, `.state`, `.step`, `.emit`), `WorkflowStepApi`, `StepOptions`, `StepRunSpec` (`packages/kernel/src/workflow/types.ts`, W1); `RunResult` (`packages/kernel/src/process/processManager.ts` — pre-existing M2 type, `{status:'success'|'failed'|'killed'; sessionId?; costUsd?; inputTokens?; outputTokens?; error?; resultText?}`); `FeatureRequestInput` (`@agentos/shared`, Task 1); `slugify` (Task 2); `FeatureRequestAdapterOps` and its I/O types (Task 3/4); `ProjectConfig`/`ProjectBuildConfig` (`@agentos/shared`, W2). Produces: `FeatureRequestDeps`, `FeatureRequestKernelDeps`, `createFeatureRequestWorkflow`.
+**Interfaces:** Consumes (imported, never redefined): `WorkflowDefinition<I>`, `WorkflowContext<I>` (`.id: string`, `.input`, `.state`, `.step`, `.emit`), `WorkflowStepApi`, `StepOptions`, `StepRunSpec` (`packages/kernel/src/workflow/types.ts`, W1); `RunResult` (`packages/kernel/src/process/processManager.ts` — pre-existing M2 type, `{status:'success'|'failed'|'killed'; sessionId?; costUsd?; inputTokens?; outputTokens?; error?; resultText?}`); `FeatureRequestInput` (`@agentos/shared`, Task 1); `slugify`, `assertCloneCwdAllowed` (Task 2); `AdapterHost.getCachedProjects` (Task 2); `FeatureRequestAdapterOps` and its I/O types (Task 3/4); `ProjectConfig`/`ProjectBuildConfig` (`@agentos/shared`, W2). Produces: `FeatureRequestDeps`, `FeatureRequestKernelDeps`, `createFeatureRequestWorkflow`, `createFeatureRequestCwdPolicy`.
 
 - [ ] **Step 1: add `@agentos/adapters` as a kernel devDependency (test-only, see Global Constraints)**
 
@@ -1265,7 +1369,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventLog } from '../../log/eventLog.js'
 import type { RunResult } from '../../process/processManager.js'
 import { WikiService } from '../../wiki/wikiService.js'
-import { createFeatureRequestWorkflow, type FeatureRequestDeps, type FeatureRequestKernelDeps } from './featureRequest.js'
+import {
+  createFeatureRequestCwdPolicy,
+  createFeatureRequestWorkflow,
+  type FeatureRequestDeps,
+  type FeatureRequestKernelDeps,
+} from './featureRequest.js'
 
 async function createBareCooRepo() {
   const root = mkdtempSync(path.join(tmpdir(), 'agentos-fr-'))
@@ -1576,6 +1685,62 @@ describe('createFeatureRequestWorkflow', () => {
     expect(runCalls.map((c) => c.name)).toEqual(['brief', 'build', 'validate', 'build-fix', 'validate-fix'])
   })
 })
+
+describe('createFeatureRequestCwdPolicy', () => {
+  const osRoot = path.join('fake', 'os')
+  const workspace = path.join(osRoot, 'agents', 'ops', 'workspace')
+  const buildEnabledProject: ProjectConfig = {
+    name: 'sandbox',
+    adapter: 'techpulse-coo',
+    repo: 'owner/sandbox',
+    clone: path.join('fake', 'clones', 'sandbox'),
+    base_branch: 'main',
+    options: {},
+    build: {
+      enabled: true,
+      model: 'sonnet',
+      permission_mode: 'acceptEdits',
+      allowed_tools: ['Bash'],
+      checks: [],
+      timeout_ms: 60_000,
+    },
+  }
+
+  it('allows the default workspace cwd with no project lookup at all', () => {
+    const policy = createFeatureRequestCwdPolicy(osRoot, () => [])
+    expect(() =>
+      policy(workspace, { skill: 'feature-build', agent: 'ops' }, { project: 'sandbox' }),
+    ).not.toThrow()
+  })
+
+  it('allows a non-workspace cwd matching the named project\'s clone when build.enabled', () => {
+    const policy = createFeatureRequestCwdPolicy(osRoot, () => [buildEnabledProject])
+    expect(() =>
+      policy(buildEnabledProject.clone, { skill: 'feature-build', agent: 'ops' }, { project: 'sandbox' }),
+    ).not.toThrow()
+  })
+
+  it('rejects a non-workspace cwd when input has no project field', () => {
+    const policy = createFeatureRequestCwdPolicy(osRoot, () => [buildEnabledProject])
+    expect(() =>
+      policy(buildEnabledProject.clone, { skill: 'feature-build', agent: 'ops' }, {}),
+    ).toThrow()
+  })
+
+  it('rejects a non-workspace cwd when the named project is not in the cache', () => {
+    const policy = createFeatureRequestCwdPolicy(osRoot, () => [])
+    expect(() =>
+      policy(buildEnabledProject.clone, { skill: 'feature-build', agent: 'ops' }, { project: 'sandbox' }),
+    ).toThrow()
+  })
+
+  it('rejects a cwd that is not exactly the named project\'s clone', () => {
+    const policy = createFeatureRequestCwdPolicy(osRoot, () => [buildEnabledProject])
+    expect(() =>
+      policy(path.join('fake', 'somewhere', 'else'), { skill: 'feature-build', agent: 'ops' }, { project: 'sandbox' }),
+    ).toThrow(/must be exactly/)
+  })
+})
 ```
 
 - [ ] **Step 3: run it, expect failure**
@@ -1595,6 +1760,7 @@ import type { KernelConfig } from '../../config.js'
 import type { EventLog } from '../../log/eventLog.js'
 import type { RunResult } from '../../process/processManager.js'
 import type { WikiService } from '../../wiki/wikiService.js'
+import { assertCloneCwdAllowed } from '../buildContainment.js'
 import { slugify } from '../slug.js'
 import type { StepRunSpec, WorkflowContext, WorkflowDefinition } from '../types.js'
 
@@ -1868,6 +2034,42 @@ export function createFeatureRequestWorkflow(
     },
   }
 }
+
+function hasProjectField(input: unknown): input is { project: string } {
+  return (
+    typeof input === 'object' &&
+    input !== null &&
+    typeof (input as { project?: unknown }).project === 'string'
+  )
+}
+
+/**
+ * Builds the `cwdPolicy` function the workflow engine calls (W1's
+ * `WorkflowRuntimeDeps.cwdPolicy`, per team-lead ruling) before spawning
+ * any `step.run` whose `cwd` is outside `agents/<agent>/workspace`. This
+ * is deliberately synchronous -- `getCachedProjects` (Task 2) reads
+ * `AdapterHost`'s last `loadProjects()` result rather than re-reading
+ * `os/projects/*.yaml`, because the engine's hook cannot `await` a fresh
+ * lookup at spawn time. `run()` above always calls (indirectly, via
+ * `kernel.adapters.loadProjects()`) a fresh load before any step that
+ * could trigger this policy, so the cache is never stale for a check made
+ * during that same instance's execution. Only `feature-request`'s own
+ * `StepRunSpec`s ever set a non-workspace `cwd`; any other workflow
+ * kind's `input` without a `project: string` field is rejected outright
+ * by `assertCloneCwdAllowed`'s "no project" branch.
+ */
+export function createFeatureRequestCwdPolicy(
+  osRoot: string,
+  getCachedProjects: () => ProjectConfig[],
+): (cwd: string, spec: StepRunSpec, input: unknown) => void {
+  return (cwd, spec, input) => {
+    const projectName = hasProjectField(input) ? input.project : undefined
+    const project = projectName
+      ? getCachedProjects().find((p) => p.name === projectName)
+      : undefined
+    assertCloneCwdAllowed({ cwd, osRoot, agent: spec.agent, project })
+  }
+}
 ```
 
 - [ ] **Step 5: run tests, expect PASS**
@@ -1889,7 +2091,13 @@ export * from './workflow/definitions/featureRequest.js'
 ```ts
 // packages/cli/src/commands/up.ts — full new content
 import { adapterRegistry } from '@agentos/adapters'
-import { createFeatureRequestWorkflow, createKernel, loadKernelConfig, type Kernel } from '@agentos/kernel'
+import {
+  createFeatureRequestCwdPolicy,
+  createFeatureRequestWorkflow,
+  createKernel,
+  loadKernelConfig,
+  type Kernel,
+} from '@agentos/kernel'
 
 export interface UpOptions {
   root: string
@@ -1903,16 +2111,25 @@ export async function up(opts: UpOptions): Promise<void> {
   )
 
   // `kernel` is assigned right after createKernel(...) returns, below --
-  // getKernel() is only ever *called* from inside a running workflow's
-  // run(), which happens well after that assignment (see featureRequest.ts's
+  // getKernel()/getCachedProjects() are only ever *called* from inside a
+  // running workflow's run() or the engine's cwdPolicy hook, both of which
+  // happen well after that assignment (see featureRequest.ts's
   // FeatureRequestDeps doc comment for why this indirection exists at all).
   let kernel: Kernel
   const featureRequestWorkflow = createFeatureRequestWorkflow({
     registry: adapterRegistry,
     getKernel: () => kernel,
   })
+  const cwdPolicy = createFeatureRequestCwdPolicy(cfg.osRoot, () =>
+    kernel.adapters.getCachedProjects(),
+  )
 
-  kernel = createKernel(cfg, adapterRegistry, [featureRequestWorkflow])
+  // W1's exact 4th-parameter shape for createKernel is this plan's
+  // best-effort guess at how WorkflowRuntimeDeps.cwdPolicy gets threaded
+  // through (team-lead ruling) -- adjust this call if W1 lands a
+  // different signature; cwdPolicy/featureRequestWorkflow themselves need
+  // no change either way.
+  kernel = createKernel(cfg, adapterRegistry, [featureRequestWorkflow], cwdPolicy)
   await kernel.start()
   console.log(
     `agent-os daemon listening on http://${cfg.host}:${cfg.port} (osRoot=${cfg.osRoot})`,
@@ -1950,7 +2167,10 @@ successfully even when the checks it ran failed.
 Wired into up.ts (not kernel.ts): createKernel's third parameter takes
 already-built WorkflowDefinitions, constructed before any Kernel exists,
 so FeatureRequestDeps takes a lazy getKernel() accessor rather than eager
-EventLog/WikiService/AdapterHost instances.
+EventLog/WikiService/AdapterHost instances. Also adds
+createFeatureRequestCwdPolicy, supplied as WorkflowRuntimeDeps.cwdPolicy
+so the engine enforces build-cwd containment itself rather than trusting
+the definition to.
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 EOF
@@ -2542,7 +2762,7 @@ EOF
 
 ## Self-Review
 
-- **Spec §5 coverage**: §5.1 input type (`FeatureRequestInput`, Task 1, appended to W1's shared `workflow.ts`) — done. §5.2 all 8 named steps in order with exact names (`brief, push-proposal, await-approval, build, validate, review, open-pr, done`, Task 5) — done, plus the conditional one-retry `build-fix`/`validate-fix`/`review-fix` path (Task 5, tested in `featureRequest.test.ts`'s 4th/5th `it`s). `autoApprove` gates `await-approval` via `waitForEvent('decision.resolved', ...)` with a 7-day timeout (`SEVEN_DAYS_MS`) — done, and the previously-missing `decision.resolved` event emission is fixed (Task 2) so the wait can ever actually resolve. `open-pr` body composition (What/Why + validation + review) — done (`buildPrBody`, Task 4). `status: shipped` flip — done (`markShipped`, Task 4). `reports/<slug>.md` — done (`writeReport`, Task 4). `done` writing `output/requests/<id>/summary.md` and a `projects/<project>/requests/<slug>.md` wiki page — done (Task 5's final `step.do`). §5.3 containment: build/validate/review get exactly `project.build.allowed_tools` and `cwd: project.clone` (Task 5's `checkSpec`/`runBuildStep`), enforced by `assertCloneCwdAllowed` (Task 2) at the W1 wiring seam; the agent never pushes (skill.md hard rules, Task 6/7); `remember`'s existing raw/-refusal and secret-refusal are unchanged and reused; the PR body is scanned with `findSecrets` before `gh pr create` (Task 4, tested). §8 error-handling rows this milestone owns: restart mid-build tells the skill to read the branch's existing commits first (`feature-build/skill.md` step 1, Task 6). §9 testing: engine-level replay/retry/waitForEvent/sleep/pause/terminate tests are explicitly W1's; this plan's own tests cover the definition test with a stub `step.run` and a temp bare repo (Task 5) and the adapter helpers against `createTempTechpulseRepo`/a from-scratch bare repo (Tasks 3–4), matching what §9 assigns to W3.
+- **Spec §5 coverage**: §5.1 input type (`FeatureRequestInput`, Task 1, appended to W1's shared `workflow.ts`) — done. §5.2 all 8 named steps in order with exact names (`brief, push-proposal, await-approval, build, validate, review, open-pr, done`, Task 5) — done, plus the conditional one-retry `build-fix`/`validate-fix`/`review-fix` path (Task 5, tested in `featureRequest.test.ts`'s 4th/5th `it`s). `autoApprove` gates `await-approval` via `waitForEvent('decision.resolved', ...)` with a 7-day timeout (`SEVEN_DAYS_MS`) — done, and the previously-missing `decision.resolved` event emission is fixed (Task 2) so the wait can ever actually resolve. `open-pr` body composition (What/Why + validation + review) — done (`buildPrBody`, Task 4). `status: shipped` flip — done (`markShipped`, Task 4). `reports/<slug>.md` — done (`writeReport`, Task 4). `done` writing `output/requests/<id>/summary.md` and a `projects/<project>/requests/<slug>.md` wiki page — done (Task 5's final `step.do`). §5.3 containment: build/validate/review get exactly `project.build.allowed_tools` and `cwd: project.clone` (Task 5's `checkSpec`/`runBuildStep`), enforced engine-side (not just trusted from the definition) by `createFeatureRequestCwdPolicy` (Task 5, built from `assertCloneCwdAllowed` + `AdapterHost.getCachedProjects`, both Task 2), supplied as `WorkflowRuntimeDeps.cwdPolicy` per team-lead ruling; the agent never pushes (skill.md hard rules, Task 6/7); `remember`'s existing raw/-refusal and secret-refusal are unchanged and reused; the PR body is scanned with `findSecrets` before `gh pr create` (Task 4, tested). §8 error-handling rows this milestone owns: restart mid-build tells the skill to read the branch's existing commits first (`feature-build/skill.md` step 1, Task 6). §9 testing: engine-level replay/retry/waitForEvent/sleep/pause/terminate tests are explicitly W1's; this plan's own tests cover the definition test with a stub `step.run` and a temp bare repo (Task 5) and the adapter helpers against `createTempTechpulseRepo`/a from-scratch bare repo (Tasks 3–4), matching what §9 assigns to W3.
 - **Placeholder scan**: no `TBD`/`TODO`/"similar to Task N" in any code block; every step has complete, runnable code or complete file content. Task 5 Step 6's typecheck depends on W1's `workflow/types.ts` existing, which is an explicitly-flagged milestone dependency ("W3 needs W1", spec §10), not an unresolved design gap in this plan.
 - **Type consistency**: `StepRunSpec`, `RunResult`, `WorkflowContext`, `WorkflowDefinition` are imported from W1's `packages/kernel/src/workflow/types.ts` / `packages/kernel/src/process/processManager.ts` and never redefined in this plan (team-lead ruling) — `StepRunSpec.task` (not `payload`) is used consistently across Tasks 5's spec builders and test. `FeatureRequestPushProposalInput/Result`, `FeatureRequestOpenPrInput/Result`, `FeatureRequestWriteReportInput/Result` are defined once (kernel `adapters/types.ts`, Task 3) and imported (not redefined) everywhere else (`requests.ts`, Task 3/4). `ProjectBuildConfig`/`ProjectConfig.build` (W2) and `CreateWorkflowRequest`/`CreateWorkflowResponse`/`ApiClient.createWorkflow` (W1) are consumed, never redefined, per team-lead ruling — Tasks 1 and 8 were rewritten to drop the duplicate definitions this plan originally carried. `FeatureRequestInput` matches spec §5.1 exactly. The `AdapterContext`/`ProjectAdapter`/`SyncResult` shapes are unchanged from the existing contract; only `ProjectAdapter.featureRequests?` is new.
-- **Package-cycle / construction-order check**: `packages/kernel` never imports `@agentos/adapters` from its `src/` (only as a test-only `devDependency`, Task 5 Step 1); `packages/adapters` continues to depend on `@agentos/kernel` for types only, unchanged from the existing `adapter.ts`. `FeatureRequestAdapterOps` living in kernel's own `adapters/types.ts` (Task 3) is what makes this possible. Separately, `FeatureRequestDeps.getKernel()` (Task 5) resolves the analogous ordering problem between `createFeatureRequestWorkflow` (called before any `Kernel` exists, to build the array `createKernel`'s third parameter needs) and the live `EventLog`/`WikiService`/`AdapterHost` `run()` needs once a workflow instance actually executes — verified by Task 5's test constructing a `FeatureRequestKernelDeps` object directly (no real `Kernel`) and by Task 5 Step 8's `up.ts` wiring using a forward-declared `let kernel` closure variable, the standard resolution for a same-module constructor-order cycle.
+- **Package-cycle / construction-order check**: `packages/kernel` never imports `@agentos/adapters` from its `src/` (only as a test-only `devDependency`, Task 5 Step 1); `packages/adapters` continues to depend on `@agentos/kernel` for types only, unchanged from the existing `adapter.ts`. `FeatureRequestAdapterOps` living in kernel's own `adapters/types.ts` (Task 3) is what makes this possible. Separately, `FeatureRequestDeps.getKernel()` (Task 5) resolves the analogous ordering problem between `createFeatureRequestWorkflow` (called before any `Kernel` exists, to build the array `createKernel`'s third parameter needs) and the live `EventLog`/`WikiService`/`AdapterHost` `run()` needs once a workflow instance actually executes — verified by Task 5's test constructing a `FeatureRequestKernelDeps` object directly (no real `Kernel`) and by Task 5 Step 8's `up.ts` wiring using a forward-declared `let kernel` closure variable, the standard resolution for a same-module constructor-order cycle. `createFeatureRequestCwdPolicy` (Task 5) has the identical shape and identical fix: it closes over `() => kernel.adapters.getCachedProjects()` rather than a `ProjectConfig[]` value, for the same reason.
