@@ -8,7 +8,7 @@ import type {
 import { Cron } from 'croner'
 import type { KernelConfig } from '../config.js'
 import type { EventLog } from '../log/eventLog.js'
-import { afterSatisfied, parseEvery } from './triggers.js'
+import { afterSatisfied, matchesOn, parseEvery } from './triggers.js'
 
 interface LoadedRoutine {
   config: RoutineConfig
@@ -190,8 +190,14 @@ export class Scheduler {
     }
   }
 
+  onEvent(e: Event): void {
+    for (const lr of this.routines.values()) {
+      if (!lr.enabled) continue
+      if (matchesOn(lr.config.on, e.type)) this.trigger(lr)
+    }
+  }
+
   // -- filled in by later tasks --
-  onEvent(_e: Event): void {}
   private tick(): void {}
   private recoverFromRestart(): void {}
   scheduleOnce(
