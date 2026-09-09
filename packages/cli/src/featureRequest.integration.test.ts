@@ -10,6 +10,7 @@ import {
   EventLog,
   type FeatureRequestDeps,
   type FeatureRequestKernelDeps,
+  type PrChecks,
   type ProjectAdapter,
   type RunResult,
   WikiService,
@@ -141,7 +142,11 @@ function fakeStep(wiki: WikiService, responses: Record<string, RunResult>) {
             op: 'note',
           })
         }
-        if (name === 'build' || name === 'build-fix') {
+        if (
+          name === 'build' ||
+          name === 'build-fix' ||
+          name === 'build-fix-ci'
+        ) {
           // Simulates what the real feature-build skill does in the
           // project's clone: create (or resume) payload.branch and commit.
           // step.run itself has no filesystem access in this stub, so the
@@ -178,6 +183,18 @@ let wiki: WikiService
 let kernelDeps: FeatureRequestKernelDeps
 let deps: FeatureRequestDeps
 let syncCalls: string[]
+/** What each successive getPrChecks poll reports; the last entry repeats. */
+let ciPolls: PrChecks[]
+let ciPollCount: number
+let failedLogCalls: string[]
+
+const green: PrChecks = { pending: [], failed: [], passed: ['ci'] }
+const pending: PrChecks = { pending: ['ci'], failed: [], passed: [] }
+const red: PrChecks = {
+  pending: [],
+  failed: [{ name: 'ci', url: 'https://github.com/o/r/actions/runs/1' }],
+  passed: [],
+}
 
 beforeEach(async () => {
   osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-fr-os-'))
@@ -214,7 +231,26 @@ beforeEach(async () => {
       },
     },
   }
-  deps = { registry, getKernel: () => kernelDeps }
+  ciPolls = [green]
+  ciPollCount = 0
+  failedLogCalls = []
+  deps = {
+    registry,
+    getKernel: () => kernelDeps,
+    github: {
+      getPrChecks: async () => {
+        const i = Math.min(ciPollCount, ciPolls.length - 1)
+        ciPollCount += 1
+        return ciPolls[i]
+      },
+      getFailedJobLog: async (_repo, url) => {
+        failedLogCalls.push(url)
+        return 'Error: lint failed in Foo.ts'
+      },
+    },
+    ciTimeoutMs: 1000,
+    ciPollMs: 100,
+  }
 })
 
 afterEach(() => {
@@ -456,6 +492,142 @@ describe('createFeatureRequestWorkflow', () => {
       'build-fix',
       'validate-fix',
     ])
+  })
+
+  /** Full green pipeline up to open-pr with a fake gh that prints `url`. */
+  async function runWithPr(
+    id: string,
+    url: string,
+    responses: Record<string, RunResult>,
+  ) {
+    const { bareDir, cloneDir } = await createBareCooRepo()
+    const proj = project(cloneDir, true)
+    kernelDeps.adapters.loadProjects = vi.fn().mockResolvedValue([proj])
+    const bodyDir = mkdtempSync(path.join(tmpdir(), 'agentos-gh-'))
+    const { writeFileSync: wf, chmodSync } = await import('node:fs')
+    const ghScript = path.join(bodyDir, 'fake-gh.js')
+    wf(
+      ghScript,
+      `#!/usr/bin/env node\nconsole.log('${url}')\nprocess.exit(0)\n`,
+      'utf8',
+    )
+    chmodSync(ghScript, 0o755)
+    const originalGhBin = process.env.AGENTOS_GH_BIN
+    process.env.AGENTOS_GH_BIN = ghScript
+    const def = createFeatureRequestWorkflow(deps)
+    const { step, runCalls } = fakeStep(wiki, {
+      validate: { status: 'success', resultText: 'PASS\nall checks green' },
+      review: { status: 'success', resultText: 'PASS\nlooks good' },
+      ...responses,
+    })
+    const input: FeatureRequestInput = {
+      project: 'sandbox',
+      title: 'Add dark mode toggle',
+      description: 'Users keep asking.',
+      autoApprove: true,
+    }
+    const emit = vi.fn()
+    let error: unknown
+    try {
+      await def.run({ id, input, state: {}, step, emit })
+    } catch (err) {
+      error = err
+    } finally {
+      if (originalGhBin === undefined) {
+        // biome-ignore lint/performance/noDelete: assigning undefined would stringify to "undefined"
+        delete process.env.AGENTOS_GH_BIN
+      } else {
+        process.env.AGENTOS_GH_BIN = originalGhBin
+      }
+    }
+    const verifyDir = mkdtempSync(path.join(tmpdir(), 'agentos-fr-verify-'))
+    await simpleGit().clone(bareDir, verifyDir)
+    const fs = await import('node:fs/promises')
+    const files = await fs.readdir(
+      path.join(verifyDir, 'docs/missions/coo/proposals'),
+    )
+    const proposalFile = files.find((f) => f.endsWith('.md')) as string
+    const proposal = await fs.readFile(
+      path.join(verifyDir, 'docs/missions/coo/proposals', proposalFile),
+      'utf8',
+    )
+    return { error, runCalls, emit, proposal }
+  }
+
+  it('waits for pending CI checks before shipping', async () => {
+    ciPolls = [pending, pending, green]
+    const { error, runCalls, emit, proposal } = await runWithPr(
+      'wf-6',
+      'https://github.com/owner/sandbox/pull/11',
+      {},
+    )
+    expect(error).toBeUndefined()
+    expect(ciPollCount).toBe(3)
+    expect(runCalls.map((c) => c.name)).toEqual([
+      'brief',
+      'build',
+      'validate',
+      'review',
+    ])
+    expect(proposal).toContain('status: shipped')
+    const ciEvents = emit.mock.calls.filter((c) => c[0] === 'workflow.ci')
+    expect(ciEvents).toHaveLength(3)
+    const report = await wiki.readPage('requests/wf-6/summary.md')
+    expect(report).toContain('pull request')
+  })
+
+  it('fixes once when CI is red, pushes, and ships only after CI turns green', async () => {
+    ciPolls = [red, green]
+    const { error, runCalls, proposal } = await runWithPr(
+      'wf-7',
+      'https://github.com/owner/sandbox/pull/12',
+      {},
+    )
+    expect(error).toBeUndefined()
+    expect(runCalls.map((c) => c.name)).toEqual([
+      'brief',
+      'build',
+      'validate',
+      'review',
+      'build-fix-ci',
+    ])
+    const fix = runCalls.find((c) => c.name === 'build-fix-ci')
+    // biome-ignore lint/suspicious/noExplicitAny: reading the injected task back
+    const priorFailure = (fix?.spec as any).task.priorFailure as string
+    expect(priorFailure).toContain('CI failed on the pull request: ci')
+    expect(priorFailure).toContain('lint failed in Foo.ts')
+    expect(failedLogCalls).toEqual(['https://github.com/o/r/actions/runs/1'])
+    expect(proposal).toContain('status: shipped')
+  })
+
+  it('never ships when CI is still red after the one fix attempt', async () => {
+    ciPolls = [red, red]
+    const { error, runCalls, proposal } = await runWithPr(
+      'wf-8',
+      'https://github.com/owner/sandbox/pull/13',
+      {},
+    )
+    expect(String(error)).toMatch(/CI still failing after one fix attempt/)
+    expect(runCalls.map((c) => c.name)).toEqual([
+      'brief',
+      'build',
+      'validate',
+      'review',
+      'build-fix-ci',
+    ])
+    expect(proposal).not.toContain('status: shipped')
+    await expect(wiki.readPage('requests/wf-8/summary.md')).rejects.toThrow()
+  })
+
+  it('never ships when CI does not finish within the timeout', async () => {
+    ciPolls = [pending]
+    const { error, proposal } = await runWithPr(
+      'wf-9',
+      'https://github.com/owner/sandbox/pull/14',
+      {},
+    )
+    expect(String(error)).toMatch(/CI did not finish/)
+    expect(proposal).not.toContain('status: shipped')
   })
 })
 

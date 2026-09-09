@@ -146,3 +146,93 @@ export async function readRepoFile(
     'utf8',
   )
 }
+
+export interface PrChecks {
+  /** Checks still queued or running. */
+  pending: string[]
+  /** Checks that failed, with the URL of the run or job that produced them. */
+  failed: Array<{ name: string; url: string }>
+  /** Checks that passed (skipped and neutral count as passed). */
+  passed: string[]
+}
+
+/** `owner/name` from a clone URL or an already-bare name. */
+export function repoSlug(repo: string): string {
+  const m = /github\.com[/:]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(repo)
+  return m ? m[1] : repo
+}
+
+interface RawCheck {
+  name?: string
+  context?: string
+  status?: string
+  conclusion?: string | null
+  state?: string
+  detailsUrl?: string
+  targetUrl?: string
+}
+
+/**
+ * The pull request's check state as GitHub reports it. The workflow polls
+ * this until nothing is pending: a request is not shipped until CI says so.
+ */
+export async function getPrChecks(
+  repo: string,
+  number: number,
+): Promise<PrChecks> {
+  const slug = repoSlug(repo)
+  assertValidRepoName(slug)
+  await requireGh()
+  const result = await gh([
+    'pr',
+    'view',
+    String(number),
+    '--repo',
+    slug,
+    '--json',
+    'statusCheckRollup',
+  ])
+  if (result.exitCode !== 0) throw new GhUnavailableError(UNAVAILABLE_HINT)
+  const raw = JSON.parse(result.stdout) as { statusCheckRollup?: RawCheck[] }
+  const out: PrChecks = { pending: [], failed: [], passed: [] }
+  for (const c of raw.statusCheckRollup ?? []) {
+    const name = c.name ?? c.context ?? 'check'
+    const url = c.detailsUrl ?? c.targetUrl ?? ''
+    const status = (c.status ?? '').toUpperCase()
+    const verdict = (c.conclusion ?? c.state ?? '').toUpperCase()
+    if (status && status !== 'COMPLETED') {
+      out.pending.push(name)
+    } else if (
+      [
+        'FAILURE',
+        'ERROR',
+        'TIMED_OUT',
+        'CANCELLED',
+        'ACTION_REQUIRED',
+      ].includes(verdict)
+    ) {
+      out.failed.push({ name, url })
+    } else if (verdict === 'PENDING' || verdict === 'EXPECTED') {
+      out.pending.push(name)
+    } else {
+      out.passed.push(name)
+    }
+  }
+  return out
+}
+
+/** Tail of the failing steps' log for a GitHub Actions run or job URL; empty when unavailable. */
+export async function getFailedJobLog(
+  repo: string,
+  url: string,
+  maxLines = 80,
+): Promise<string> {
+  const m = /\/actions\/runs\/(\d+)/.exec(url)
+  if (!m) return ''
+  const slug = repoSlug(repo)
+  assertValidRepoName(slug)
+  const result = await gh(['run', 'view', m[1], '--repo', slug, '--log-failed'])
+  if (result.exitCode !== 0) return ''
+  const lines = result.stdout.split(/\r?\n/).filter((l) => l.trim() !== '')
+  return lines.slice(-maxLines).join('\n')
+}

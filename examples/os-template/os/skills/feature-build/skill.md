@@ -11,9 +11,12 @@ proposalPath, priorFailure? }`. You have no `mcp__agentos__*` tools here,
 so `proposalPath` is informational only (it names the wiki page the
 proposal came from) — `title`/`description` plus your own reading of the
 repository are your source of truth for what to build. If
-`payload.priorFailure` is present, this is a retry: `feature-validate` or
-`feature-review` rejected the previous attempt for exactly this reason —
-fix that, specifically, before doing anything else.
+`payload.priorFailure` is present, this is a retry: `feature-validate`,
+`feature-review`, or the pull request's CI rejected the previous attempt
+for exactly this reason — fix that, specifically, before doing anything
+else. A CI failure includes the tail of the failing job's log; the fix
+must make that exact job pass, because nothing is shipped until the PR's
+checks are green.
 
 `payload.branch` always follows the `req/<slug>` naming convention the
 `feature-request` workflow computes (e.g. `req/add-dark-mode-toggle`) —

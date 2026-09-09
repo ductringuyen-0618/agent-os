@@ -13,6 +13,7 @@ import {
   bootstrapCooLayout,
   markShipped,
   openPullRequest,
+  pushBranch,
   pushProposal,
   writeReport,
 } from './requests.js'
@@ -316,6 +317,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
     openPullRequest,
     markShipped,
     writeReport,
+    pushBranch,
   },
 }
 
