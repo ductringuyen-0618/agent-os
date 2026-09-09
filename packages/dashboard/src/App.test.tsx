@@ -62,4 +62,14 @@ describe('App', () => {
       await screen.findByRole('heading', { name: 'Requests' }),
     ).toBeInTheDocument()
   })
+
+  it('reaches the tenth panel with the 0 key', async () => {
+    installMockFetch()
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
+    render(<App />)
+    await userEvent.keyboard('0')
+    expect(
+      await screen.findByRole('heading', { name: 'Requests' }),
+    ).toBeInTheDocument()
+  })
 })

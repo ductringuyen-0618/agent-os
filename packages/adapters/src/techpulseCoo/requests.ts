@@ -192,6 +192,18 @@ export async function openPullRequest(
     payload: { slug: input.slug, branch: input.branch },
   })
 
+  // A remote that is not on GitHub (a local bare repo, a private git host)
+  // has nowhere for `gh pr create` to go. The branch is pushed and the
+  // request carries on; the report says so instead of failing the workflow
+  // after a successful build.
+  if (!/github\.com[/:]/.test(ctx.project.repo)) {
+    return {
+      url: '',
+      number: 0,
+      skipped: `branch ${input.branch} pushed; remote is not on GitHub, so no pull request was opened`,
+    }
+  }
+
   const bodyDir = await mkdtemp(path.join(tmpdir(), 'agentos-pr-'))
   const bodyFile = path.join(bodyDir, 'body.md')
   await writeFile(bodyFile, body, 'utf8')

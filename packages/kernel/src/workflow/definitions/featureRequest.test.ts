@@ -69,7 +69,7 @@ function project(clone: string, buildEnabled: boolean): ProjectConfig {
   return {
     name: 'sandbox',
     adapter: 'techpulse-coo',
-    repo: 'owner/sandbox',
+    repo: 'https://github.com/owner/sandbox.git',
     clone,
     base_branch: 'main',
     options: {
@@ -460,7 +460,7 @@ describe('createFeatureRequestCwdPolicy', () => {
   const buildEnabledProject: ProjectConfig = {
     name: 'sandbox',
     adapter: 'techpulse-coo',
-    repo: 'owner/sandbox',
+    repo: 'https://github.com/owner/sandbox.git',
     clone: path.join('fake', 'clones', 'sandbox'),
     base_branch: 'main',
     options: {},

@@ -56,7 +56,10 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return
-      const idx = Number.parseInt(e.key, 10) - 1
+      // 1-9 are the first nine panels; 0 stands in for the tenth.
+      const digit = Number.parseInt(e.key, 10)
+      if (Number.isNaN(digit)) return
+      const idx = digit === 0 ? 9 : digit - 1
       if (idx >= 0 && idx < NAV.length) go(NAV[idx].id)
     }
     window.addEventListener('keydown', onKey)
@@ -134,7 +137,7 @@ export default function App() {
                     />
                     <span className="flex-1">{n.label}</span>
                     <kbd className="font-mono text-[10px] text-muted/50 group-hover:text-muted">
-                      {i + 1}
+                      {i === 9 ? 0 : i + 1}
                     </kbd>
                   </button>
                 </li>
@@ -142,7 +145,7 @@ export default function App() {
             })}
           </ul>
           <div className="mt-auto px-4 py-3 text-[11px] text-muted/70">
-            Press 1–{NAV.length} to switch panels
+            Press 1–9 and 0 to switch panels
           </div>
         </nav>
         <main className="flex-1 overflow-auto p-6">

@@ -42,8 +42,11 @@ export interface FeatureRequestOpenPrInput {
 }
 
 export interface FeatureRequestOpenPrResult {
+  /** Empty when no pull request could be opened (see `skipped`). */
   url: string
   number: number
+  /** Set when the branch was pushed but no PR exists, e.g. a non-GitHub remote. */
+  skipped?: string
 }
 
 export interface FeatureRequestWriteReportInput {

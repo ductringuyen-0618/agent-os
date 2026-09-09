@@ -353,7 +353,7 @@ export function createFeatureRequestWorkflow(
         await ops.writeReport(actx, {
           slug,
           branch,
-          prUrl: pr.url,
+          prUrl: pr.url || (pr.skipped ?? ''),
           validationOutput: validateOutcome.text,
           reviewOutput: reviewOutcome.text,
         })
@@ -366,7 +366,7 @@ export function createFeatureRequestWorkflow(
           content: renderSummary(ctx.input, {
             slug,
             branch,
-            prUrl: openPr.url,
+            prUrl: openPr.url || (openPr.skipped ?? ''),
           }),
           op: 'note',
         })
@@ -375,7 +375,7 @@ export function createFeatureRequestWorkflow(
           content: renderRequestPage(ctx.input, {
             slug,
             branch,
-            prUrl: openPr.url,
+            prUrl: openPr.url || (openPr.skipped ?? ''),
           }),
           op: 'note',
           links: [pushResult.file],

@@ -188,6 +188,33 @@ describe('pushProposal', () => {
   })
 })
 
+describe('openPullRequest on a non-GitHub remote', () => {
+  it('pushes the branch and reports the skipped PR instead of failing', async () => {
+    const { bareDir, cloneDir } = await createTempTechpulseRepo()
+    const { ctx } = fakeCtx(cloneDir)
+    const git = simpleGit(cloneDir)
+    await git.checkoutLocalBranch('req/no-github')
+    writeFileSync(path.join(cloneDir, 'CHANGED.md'), 'change\n')
+    await git.add('CHANGED.md')
+    await git.commit('feat: no github')
+
+    const result = await openPullRequest(ctx, {
+      branch: 'req/no-github',
+      slug: 'no-github',
+      title: 'No GitHub here',
+      proposalFile: 'docs/missions/coo/proposals/001-dark-mode.md',
+      proposalWhatWhy: '## What you get\nSomething.',
+      validationOutput: 'PASS',
+      reviewOutput: 'PASS',
+    })
+
+    expect(result.url).toBe('')
+    expect(result.skipped).toMatch(/not on GitHub/)
+    const branches = await simpleGit(bareDir).branch()
+    expect(branches.all).toContain('req/no-github')
+  })
+})
+
 describe('openPullRequest', () => {
   const originalGhBin = process.env.AGENTOS_GH_BIN
   afterEach(() => {
@@ -202,6 +229,8 @@ describe('openPullRequest', () => {
   it('pushes the branch and returns the PR url/number from gh', async () => {
     const { bareDir, cloneDir } = await createTempTechpulseRepo()
     const { ctx } = fakeCtx(cloneDir)
+    // The push goes to the clone's own origin; only the PR needs GitHub.
+    ctx.project.repo = 'https://github.com/owner/sandbox.git'
     process.env.AGENTOS_GH_BIN = writeFakeGh(
       mkdtempSync(path.join(tmpdir(), 'agentos-gh-')),
     )
