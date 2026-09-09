@@ -144,6 +144,17 @@ export class Scheduler {
     return this.runRoutine(lr.config, payload)
   }
 
+  /** Run a skill immediately, by skill name: reuses the first loaded routine with that skill, else an ad-hoc routine on agent `ops`. */
+  async runSkill(
+    skill: string,
+    payload?: Record<string, unknown>,
+    agent?: string,
+  ): Promise<string> {
+    const base = this.resolveAdhocRoutine(skill)
+    const config = agent ? { ...base, agent } : base
+    return this.runRoutine(config, payload)
+  }
+
   private async runRoutine(
     config: RoutineConfig,
     payload?: Record<string, unknown>,

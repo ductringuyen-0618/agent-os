@@ -1,66 +1,16 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import {
-  type CreateRunRequest,
-  type CreateRunResponse,
-  type ErrorResponse,
-  type HealthResponse,
-  type KillRunResponse,
-  type RoutineConfig,
-  type RoutinesFile,
-  parseRoutinesFile,
+import type {
+  CreateRunRequest,
+  CreateRunResponse,
+  ErrorResponse,
+  HealthResponse,
+  KillRunResponse,
 } from '@agentos/shared'
 import fastifyWebsocket from '@fastify/websocket'
 import Fastify, { type FastifyInstance } from 'fastify'
 import type { Kernel } from '../kernel.js'
-import { assemblePrompt } from '../process/promptAssembler.js'
 import { registerInternalRoutes } from './internal.js'
 
 const VERSION = '0.1.0'
-
-const DEFAULT_ROUTINES: RoutinesFile = {
-  defaults: {
-    model: 'sonnet',
-    permission_mode: 'plan',
-    allowed_tools: ['Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch'],
-    max_attempts: 2,
-    timeout_ms: 300_000,
-  },
-  routines: [],
-}
-
-async function loadRoutines(osRoot: string): Promise<RoutinesFile> {
-  try {
-    const text = await fs.readFile(path.join(osRoot, 'routines.yaml'), 'utf8')
-    return parseRoutinesFile(text)
-  } catch {
-    return DEFAULT_ROUTINES
-  }
-}
-
-/**
- * M1 stand-in for M2's process/mcpConfig.ts#writeRunMcpConfig: writes an
- * mcp.json with no servers (there is no SyscallServer yet) so
- * ProcessManager still has a real --mcp-config path to pass to claude -p,
- * at the runtime layout contract §2 specifies (runs/<runId>/mcp.json).
- */
-async function writeStubMcpConfig(
-  runtimeDir: string,
-  runId: string,
-): Promise<string> {
-  const dir = path.join(runtimeDir, 'runs', runId)
-  await fs.mkdir(dir, { recursive: true })
-  const mcpPath = path.join(dir, 'mcp.json')
-  await fs.writeFile(mcpPath, JSON.stringify({ mcpServers: {} }, null, 2))
-  return mcpPath
-}
-
-function findRoutineForSkill(
-  routines: RoutinesFile,
-  skill: string,
-): RoutineConfig | undefined {
-  return routines.routines.find((r) => r.skill === skill)
-}
 
 export function buildServer(kernel: Kernel): FastifyInstance {
   const { cfg, log, pm, wiki, scheduler } = kernel
@@ -127,58 +77,55 @@ export function buildServer(kernel: Kernel): FastifyInstance {
         .code(400)
         .send({ error: 'skill is required' } satisfies ErrorResponse)
 
-    const routines = await loadRoutines(cfg.osRoot)
-    const routine = findRoutineForSkill(routines, body.skill)
-    const agent = body.agent ?? routine?.agent ?? 'ops'
-
-    const run = log.createRun({
-      routine: routine?.name ?? body.skill,
-      skill: body.skill,
-      agent,
-      payload: body.payload,
-    })
-
-    const mcpConfigPath = await writeStubMcpConfig(cfg.runtimeDir, run.id)
-    const { prompt, systemPromptAppend } = await assemblePrompt({
-      osRoot: cfg.osRoot,
-      skill: body.skill,
-      agent,
-      task: body.payload ? JSON.stringify(body.payload) : undefined,
-    })
-    const workspace = path.join(cfg.osRoot, 'agents', agent, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-
-    pm.start(run, {
-      prompt,
-      systemPromptAppend,
-      cwd: workspace,
-      model: routine?.model ?? routines.defaults.model,
-      permissionMode:
-        routine?.permission_mode ?? routines.defaults.permission_mode,
-      allowedTools: routine?.allowed_tools ?? routines.defaults.allowed_tools,
-      addDirs: [cfg.osRoot],
-      mcpConfigPath,
-      timeoutMs: routine?.timeout_ms ?? routines.defaults.timeout_ms,
-    }).catch((err: unknown) => {
-      // pm.start() only rejects on a bug (e.g. a synchronous throw before
-      // its first await) since normal subprocess failure resolves with
-      // status 'failed'/'killed'. Without this catch, that rejection would
-      // be unhandled and crash the whole daemon process for one bad run.
-      app.log.error({ err, runId: run.id }, 'pm.start() rejected')
-      log.updateRun(run.id, {
-        status: 'failed',
-        endedAt: new Date().toISOString(),
-        error: err instanceof Error ? err.message : String(err),
-      })
-    })
-
-    return reply.code(202).send({ runId: run.id } satisfies CreateRunResponse)
+    const runId = await scheduler.runSkill(body.skill, body.payload, body.agent)
+    return reply.code(202).send({ runId } satisfies CreateRunResponse)
   })
 
   app.post('/api/runs/:id/kill', async (req) => {
     const { id } = req.params as { id: string }
     return { ok: pm.kill(id) } satisfies KillRunResponse
   })
+
+  app.get('/api/routines', async () => scheduler.list())
+
+  app.post<{
+    Params: { name: string }
+    Body: { payload?: Record<string, unknown> }
+  }>('/api/routines/:name/run', async (req, reply) => {
+    try {
+      const runId = await scheduler.runNow(req.params.name, req.body?.payload)
+      return { runId }
+    } catch (err) {
+      reply.code(404)
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  app.post<{ Params: { name: string } }>(
+    '/api/routines/:name/enable',
+    async (req, reply) => {
+      try {
+        scheduler.setEnabled(req.params.name, true)
+        return { ok: true }
+      } catch (err) {
+        reply.code(404)
+        return { error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
+
+  app.post<{ Params: { name: string } }>(
+    '/api/routines/:name/disable',
+    async (req, reply) => {
+      try {
+        scheduler.setEnabled(req.params.name, false)
+        return { ok: true }
+      } catch (err) {
+        reply.code(404)
+        return { error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
 
   app.get('/ws', { websocket: true }, (socket) => {
     const unsubscribe = log.subscribe((event) => {

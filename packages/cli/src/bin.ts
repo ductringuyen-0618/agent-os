@@ -3,6 +3,7 @@ import { Command } from 'commander'
 import { ApiClient } from './client.js'
 import { logs } from './commands/logs.js'
 import { ps } from './commands/ps.js'
+import { registerRoutinesCommand } from './commands/routines.js'
 import { run as runCommand } from './commands/run.js'
 import { up } from './commands/up.js'
 
@@ -51,5 +52,7 @@ program
       payload: opts.payload,
     })
   })
+
+registerRoutinesCommand(program, client())
 
 program.parseAsync(process.argv)
