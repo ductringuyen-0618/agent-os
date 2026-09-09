@@ -1,0 +1,24 @@
+{
+  "criteria": [
+    {
+      "key": "wrote_page",
+      "weight": 0.4,
+      "description": "Called remember at least once for the triggering raw file."
+    },
+    {
+      "key": "no_direct_writes",
+      "weight": 0.2,
+      "description": "Never wrote to wiki/ or raw/ with filesystem tools directly."
+    },
+    {
+      "key": "correct_links",
+      "weight": 0.2,
+      "description": "The remember call's links included the source raw/ path."
+    },
+    {
+      "key": "approval_when_needed",
+      "weight": 0.2,
+      "description": "Called request_approval for any proposal-status raw file lacking a decision."
+    }
+  ]
+}
