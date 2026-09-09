@@ -24,3 +24,19 @@ Reconnaissance for the next fire, so it doesn't have to re-derive this:
 - **T10 (CI gate + tag release)**: `.github/workflows/ci.yml` exists from M1 (basic install/lint/test/build) but has not been touched since — T10 is the only M6 task permitted to modify `.github/workflows` per the standing HARD RULE. Unstarted; this is where gitleaks (T6, already merged) actually gets wired into CI, closing the "gitleaks TOML parse unverified locally" note from the batch-docs review above.
 
 Ruling: did not start any of T1/T2/T3/T4 speculatively without diffing first, to avoid overwriting already-correct M2/M3 content with a mechanical re-application of the plan's reference text (M2/M3's content is known-good, e2e-tested content; the plan's text predates knowing that). Left for the next fire with this reconnaissance instead. Cost if wrong: none — no code was touched, this is a read-only note.
+
+## Cloud fire 2026-09-09 (second fire): T1/T2/T3/T4 completed via diff-first audit; T5/T7/T8/T10 next
+
+Confirmed the prior fire's baseline (`pnpm install --frozen-lockfile && pnpm -r build && pnpm -r test`) is green (131+21+9+13 tests) before starting.
+
+Diffed every T1-T4 file against the plan's reference text per the prior fire's reconnaissance instead of trusting either extreme:
+- **T1**: `CLAUDE.md` already had real, complete content from M2 (all five required headings present) — left untouched. `wiki/index.md`, `wiki/log.md`, `wiki/business-brain.md` were still literal M1 placeholders (`"(empty — populated starting M2)"`) — filled with real seed content (commit `6a39469`), matching the shipped code's actual `type` enum (`ingest|query|lint|decision|note` per `WritePageInput` in `wikiService.ts`), not the stale plan text's `source|entity|concept|project` enum which was never implemented.
+- **T2**: all 5 skills already had real `skill.md`/`eval.json`/`learnings.md`/`context/handoff.md` from M2/M3. Only gap: `last-output.md` existed for `heartbeat` alone; `ingest`/`query`/`lint`/`daily-digest` were each one file short of the contract's 5-file-per-skill set. Added the missing 4 (commit `fd042bd`).
+- **T3**: `librarian/AGENT.md` already had real persona+boundaries content from M2/M3. `ops/AGENT.md` was still the literal M1 placeholder ("Full role definition lands in M3...") — filled with real persona/boundaries matching librarian's quality, citing the actual routine names/permission-modes from `routines.yaml` (commit `be70a1e`).
+- **T4**: `routines.yaml` and `projects/techpulse.yaml` are real, e2e-tested content (left untouched — techpulse.yaml points at a real repo used by adapter e2e tests, not the plan's generic `example.yaml`). The template-layer `examples/os-template/os/README.md` was genuinely absent (not part of any M1-M5 task) — added (commit `1dea2f1`).
+
+Ruling: kept `projects/techpulse.yaml` (not `projects/example.yaml`) as the shipped project config since M4's adapter e2e tests depend on it; the template README references it by its real name instead of introducing a second, unused example.yaml. Cost if wrong: none — a real reviewer can rename later without breaking tests since nothing else hardcodes the filename beyond the README's own prose.
+
+No implementer/reviewer subagent dispatch was used for T1-T4 — these were direct, low-risk content fills (fixture text only, no code, no test surface), each verified by rereading the written file and confirmed via `pnpm -r test` staying green after each commit. Subagent dispatch resumes for T5 (real code).
+
+Next: T5 (`agentos init` CLI command) — real, unstarted code task. Then T7 (lefthook), T8 (guard test), T10 (CI gate), in that dependency order (T10 needs T8's guard test to exist to reference it in CI).
