@@ -89,6 +89,13 @@ export interface FeatureRequestAdapterOps {
   ): Promise<FeatureRequestWriteReportResult>
   /** Push the request branch again after a fix commit (CI retry). */
   pushBranch(ctx: AdapterContext, branch: string): Promise<void>
+  /** Rewrite the proposal's frontmatter status on base_branch and push (building / approved). */
+  setProposalStatus(
+    ctx: AdapterContext,
+    slug: string,
+    proposalFile: string,
+    status: string,
+  ): Promise<void>
 }
 
 export interface ProjectAdapter {

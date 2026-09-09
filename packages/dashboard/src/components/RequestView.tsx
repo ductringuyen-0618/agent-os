@@ -176,6 +176,24 @@ export function RequestView({ workflowId }: { workflowId: string }) {
 
       <WorkflowStepper steps={steps} now={now} />
 
+      {workflow.status === 'waiting' && (
+        <p className="rounded-md border border-signal/40 bg-signal/5 px-3 py-2 text-xs text-muted">
+          The proposal is pushed and waiting for your call. Approve or reject it
+          under Decisions; the build starts the moment you approve.
+        </p>
+      )}
+      {workflow.status === 'succeeded' &&
+        !steps.some((s) => s.name === 'build') && (
+          <p className="rounded-md border border-border px-3 py-2 text-xs text-muted">
+            Approved and pushed, but not built here: {workflow.project} has no
+            build grant, so agent-os stops after approval and the project's own
+            COO routine picks the proposal up on its next run. To build approved
+            requests locally with live progress, add a{' '}
+            <code className="font-mono text-accent">build:</code> block to
+            os/projects/{workflow.project}.yaml.
+          </p>
+        )}
+
       {activeStep?.runId && (
         <div className="card p-3">
           <h4 className="mb-2 text-xs font-medium text-muted">

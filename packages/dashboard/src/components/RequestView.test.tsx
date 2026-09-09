@@ -171,3 +171,76 @@ describe('RequestView', () => {
     )
   })
 })
+
+describe('RequestView explains what happens next', () => {
+  function workflowWith(status: string, stepNames: string[]) {
+    return {
+      workflow: {
+        id: 'wf_1',
+        kind: 'feature-request',
+        status,
+        project: 'techpulse',
+        title: 'Add a personalized company digest',
+        input: {},
+        state: {},
+        startedAt: '2026-09-09T10:00:00Z',
+        createdAt: '2026-09-09T10:00:00Z',
+        updatedAt: '2026-09-09T10:01:00Z',
+      },
+      steps: stepNames.map((name, i) => ({
+        id: `s${i}`,
+        workflowId: 'wf_1',
+        name,
+        seq: i + 1,
+        status: 'succeeded',
+        attempt: 1,
+        startedAt: '2026-09-09T10:00:00Z',
+        endedAt: '2026-09-09T10:00:30Z',
+      })),
+    }
+  }
+
+  it('tells the operator to approve under Decisions while waiting', async () => {
+    setup({
+      'GET /api/workflows/wf_1': () =>
+        workflowWith('waiting', ['brief', 'push-proposal', 'await-approval']),
+    })
+    render(
+      <ToastProvider>
+        <RequestView workflowId="wf_1" />
+      </ToastProvider>,
+    )
+    expect(
+      await screen.findByText(/waiting for your call/i),
+    ).toBeInTheDocument()
+  })
+
+  it('explains a request that ended after approval without a build grant', async () => {
+    setup({
+      'GET /api/workflows/wf_1': () =>
+        workflowWith('succeeded', ['brief', 'push-proposal', 'await-approval']),
+    })
+    render(
+      <ToastProvider>
+        <RequestView workflowId="wf_1" />
+      </ToastProvider>,
+    )
+    expect(
+      await screen.findByText(/techpulse has no build grant/i),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing extra when the request was built', async () => {
+    setup({
+      'GET /api/workflows/wf_1': () =>
+        workflowWith('succeeded', ['brief', 'build', 'validate', 'done']),
+    })
+    render(
+      <ToastProvider>
+        <RequestView workflowId="wf_1" />
+      </ToastProvider>,
+    )
+    await screen.findByText('Add a personalized company digest')
+    expect(screen.queryByText(/no build grant/i)).not.toBeInTheDocument()
+  })
+})
