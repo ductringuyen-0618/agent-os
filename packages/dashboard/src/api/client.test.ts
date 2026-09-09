@@ -42,3 +42,31 @@ describe('ApiClient', () => {
     expect(detail.skillMd).toContain('# skill')
   })
 })
+
+describe('ApiClient — projects', () => {
+  beforeEach(() => installMockFetch())
+
+  it('lists github repos', async () => {
+    const client = new ApiClient()
+    const repos = await client.listGithubRepos()
+    expect(repos).toEqual(fixtures.githubRepos)
+  })
+
+  it('lists projects', async () => {
+    const client = new ApiClient()
+    const list = await client.listProjects()
+    expect(list).toEqual([fixtures.projectListItem])
+  })
+
+  it('adds a project', async () => {
+    const client = new ApiClient()
+    const result = await client.addProject({ repo: 'octo/widgets' })
+    expect(result.project.name).toBe('widgets')
+  })
+
+  it('removes a project', async () => {
+    const client = new ApiClient()
+    const result = await client.removeProject('widgets')
+    expect(result.ok).toBe(true)
+  })
+})

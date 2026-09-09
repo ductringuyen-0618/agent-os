@@ -37,4 +37,15 @@ describe('App', () => {
     await userEvent.type(screen.getByLabelText('scratch'), '7')
     expect(screen.getByRole('heading', { name: 'Runs' })).toBeInTheDocument()
   })
+
+  it('switches to the Projects panel', async () => {
+    installMockFetch()
+    render(<App />)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Projects', exact: true }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Projects' }),
+    ).toBeInTheDocument()
+  })
 })
