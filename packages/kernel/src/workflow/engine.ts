@@ -11,6 +11,7 @@ import type { ProcessManager } from '../process/processManager.js'
 import { WorkflowSuspended, createWorkflowContext } from './context.js'
 import { WorkflowRegistry } from './registry.js'
 import { WorkflowStore } from './store.js'
+import type { WorkflowRuntimeDeps } from './types.js'
 
 const DEFAULT_MAX_CONCURRENT = 2
 
@@ -32,6 +33,7 @@ export class WorkflowEngine {
     private cfg: KernelConfig,
     private log: EventLog,
     private pm: ProcessManager,
+    private cwdPolicy?: WorkflowRuntimeDeps['cwdPolicy'],
   ) {
     this.store = new WorkflowStore(log)
   }
@@ -229,6 +231,7 @@ export class WorkflowEngine {
         pm: this.pm,
         defaults: this.defaults,
         daemonUrl: `http://${this.cfg.host}:${this.cfg.port}`,
+        cwdPolicy: this.cwdPolicy,
         onStepEvent: (type, extra) => {
           const current = this.store.get(id)
           if (current) this.emitEvent(current, type, extra)

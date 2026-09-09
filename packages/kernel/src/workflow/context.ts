@@ -24,6 +24,12 @@ function checkPause(deps: WorkflowRuntimeDeps, instanceId: string): void {
   if (current?.status === 'paused') throw new WorkflowSuspended()
 }
 
+/** True if `dir` is `base` itself or a descendant of it. */
+function isUnderDir(dir: string, base: string): boolean {
+  const rel = path.relative(base, dir)
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -234,19 +240,47 @@ export function createWorkflowContext<I = Record<string, unknown>>(
       deps.daemonUrl,
       runToken,
     )
-    const cwd =
-      spec.cwd ?? path.join(deps.cfg.osRoot, 'agents', spec.agent, 'workspace')
-    // A later milestone gates any spec.cwd outside the default agent workspace
-    // (a project clone) behind that project's build.enabled + project.clone
-    // (spec §5.3) with a guard call inserted right here, before the spawn --
-    // this line is that wiring point; W1 does not implement the check itself.
+    const workspace = path.join(
+      deps.cfg.osRoot,
+      'agents',
+      spec.agent,
+      'workspace',
+    )
+    const cwd = spec.cwd ?? workspace
+    // A `spec.cwd` outside the agent's default workspace (e.g. a project
+    // clone, spec §5.3) must be explicitly allowed by the caller's
+    // cwdPolicy before spawning into it -- an absent policy is a hard
+    // failure, not a silent allow, since containment is a safety property.
+    if (spec.cwd !== undefined && !isUnderDir(cwd, workspace)) {
+      try {
+        if (!deps.cwdPolicy) {
+          throw new Error(
+            'step.run cwd outside the agent workspace requires a cwdPolicy',
+          )
+        }
+        deps.cwdPolicy(cwd, spec, instance.input)
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        deps.store.updateStep(row.id, {
+          status: 'failed',
+          error: errorMsg,
+          endedAt: new Date().toISOString(),
+        })
+        deps.onStepEvent('workflow.step.failed', {
+          step: name,
+          seq: mySeq,
+          error: errorMsg,
+        })
+        throw err instanceof Error ? err : new Error(errorMsg)
+      }
+    }
     await fs.mkdir(cwd, { recursive: true })
     const common = {
       cwd,
       model: spec.model ?? deps.defaults.model,
       permissionMode: spec.permissionMode ?? deps.defaults.permission_mode,
       allowedTools: spec.allowedTools ?? deps.defaults.allowed_tools,
-      addDirs: [deps.cfg.osRoot, ...(spec.addDirs ?? [])],
+      addDirs: [deps.cfg.osRoot, cwd, ...(spec.addDirs ?? [])],
       mcpConfigPath,
       timeoutMs: spec.timeoutMs ?? deps.defaults.timeout_ms,
     }

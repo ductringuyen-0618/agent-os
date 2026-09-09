@@ -162,3 +162,124 @@ describe('WorkflowEngine step.run', () => {
     expect(engine.get(instance.id)?.status).toBe('succeeded')
   }, 15_000)
 })
+
+describe('WorkflowEngine step.run cwdPolicy', () => {
+  function makeCfg(osRoot: string): KernelConfig {
+    return {
+      osRoot,
+      runtimeDir: path.join(osRoot, '..', '.agentos'),
+      dbPath: ':memory:',
+      claudeBin: 'node',
+      host: '127.0.0.1',
+      port: 4545,
+      logLevel: 'info',
+    } as KernelConfig
+  }
+
+  it('fails the step when cwd is outside the agent workspace and no cwdPolicy is configured', async () => {
+    const osRoot = await makeOsRoot()
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(':memory:')
+    const pm = new ProcessManager(cfg, log)
+    pm.runToCompletion = vi
+      .fn()
+      .mockResolvedValue({ status: 'success', sessionId: 's1' })
+    const engine = new WorkflowEngine(cfg, log, pm) // no cwdPolicy configured
+    const outsideCwd = path.join(osRoot, '..', 'project-clone')
+    const def: WorkflowDefinition = {
+      kind: 'no-policy',
+      async run(ctx) {
+        await ctx.step.run('build', {
+          skill: 'brief',
+          agent: 'ops',
+          cwd: outsideCwd,
+        })
+      },
+    }
+    engine.registry.register(def)
+
+    const instance = await engine.create('no-policy', {})
+    await waitForStatus(engine, instance.id, ['succeeded', 'failed'])
+
+    expect(engine.get(instance.id)?.status).toBe('failed')
+    expect(engine.get(instance.id)?.error).toBe(
+      'step.run cwd outside the agent workspace requires a cwdPolicy',
+    )
+    expect(pm.runToCompletion).not.toHaveBeenCalled()
+  })
+
+  it('fails the step with the cwdPolicy error when the policy throws', async () => {
+    const osRoot = await makeOsRoot()
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(':memory:')
+    const pm = new ProcessManager(cfg, log)
+    pm.runToCompletion = vi
+      .fn()
+      .mockResolvedValue({ status: 'success', sessionId: 's1' })
+    const outsideCwd = path.join(osRoot, '..', 'project-clone')
+    const cwdPolicy = vi.fn(() => {
+      throw new Error('project techpulse does not have build.enabled')
+    })
+    const engine = new WorkflowEngine(cfg, log, pm, cwdPolicy)
+    const def: WorkflowDefinition = {
+      kind: 'policy-blocks',
+      async run(ctx) {
+        await ctx.step.run('build', {
+          skill: 'brief',
+          agent: 'ops',
+          cwd: outsideCwd,
+        })
+      },
+    }
+    engine.registry.register(def)
+
+    const instance = await engine.create('policy-blocks', {})
+    await waitForStatus(engine, instance.id, ['succeeded', 'failed'])
+
+    expect(engine.get(instance.id)?.status).toBe('failed')
+    expect(engine.get(instance.id)?.error).toBe(
+      'project techpulse does not have build.enabled',
+    )
+    expect(cwdPolicy).toHaveBeenCalledWith(
+      outsideCwd,
+      expect.objectContaining({ cwd: outsideCwd }),
+      {},
+    )
+    expect(pm.runToCompletion).not.toHaveBeenCalled()
+  })
+
+  it('spawns with the custom cwd added via --add-dir when cwdPolicy allows it', async () => {
+    const osRoot = await makeOsRoot()
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(':memory:')
+    const pm = new ProcessManager(cfg, log)
+    pm.runToCompletion = vi
+      .fn()
+      .mockResolvedValue({ status: 'success', sessionId: 's1' })
+    const outsideCwd = path.join(osRoot, '..', 'project-clone')
+    const cwdPolicy = vi.fn() // does not throw -- allowed
+    const engine = new WorkflowEngine(cfg, log, pm, cwdPolicy)
+    const def: WorkflowDefinition = {
+      kind: 'policy-allows',
+      async run(ctx) {
+        await ctx.step.run('build', {
+          skill: 'brief',
+          agent: 'ops',
+          cwd: outsideCwd,
+        })
+      },
+    }
+    engine.registry.register(def)
+
+    const instance = await engine.create('policy-allows', {})
+    await waitForStatus(engine, instance.id, ['succeeded', 'failed'])
+
+    expect(engine.get(instance.id)?.status).toBe('succeeded')
+    expect(cwdPolicy).toHaveBeenCalled()
+    // biome-ignore lint/suspicious/noExplicitAny: asserting against a vi.fn() mock's captured call args
+    const mainSpec = (pm.runToCompletion as any).mock.calls[0][1]
+    expect(mainSpec.cwd).toBe(outsideCwd)
+    expect(mainSpec.addDirs).toContain(outsideCwd)
+    expect(mainSpec.addDirs).toContain(osRoot)
+  })
+})

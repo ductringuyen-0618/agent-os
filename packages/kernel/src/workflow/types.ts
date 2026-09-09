@@ -60,4 +60,13 @@ export interface WorkflowRuntimeDeps {
   defaults: RoutineDefaults
   daemonUrl: string
   onStepEvent: (type: EventType, extra: Record<string, unknown>) => void
+  /**
+   * Consulted by `step.run` before spawning whenever `spec.cwd` is set and
+   * resolves outside `<osRoot>/agents/<agent>/workspace` (e.g. a project
+   * clone). Absent entirely -- not just a no-op -- means "no containment
+   * guard is configured", which `step.run` treats as a hard failure rather
+   * than silently allowing an out-of-workspace spawn. Throwing fails the
+   * step with that error.
+   */
+  cwdPolicy?: (cwd: string, spec: StepRunSpec, input: unknown) => void
 }
