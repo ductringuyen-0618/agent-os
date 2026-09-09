@@ -3,6 +3,7 @@ import { Command } from 'commander'
 import { ApiClient } from './client.js'
 import { registerApprove } from './commands/approve.js'
 import { registerDecisions } from './commands/decisions.js'
+import { runInit } from './commands/init.js'
 import { logs } from './commands/logs.js'
 import { ps } from './commands/ps.js'
 import { registerReject } from './commands/reject.js'
@@ -28,6 +29,17 @@ program
   .option('--port <port>', 'HTTP port')
   .action(async (opts) => {
     await up({ root: opts.root, port: opts.port })
+  })
+
+program
+  .command('init <dir>')
+  .description('create a new agent-os instance from the built-in template')
+  .option(
+    '--template',
+    'reserved for future template variants (currently a no-op)',
+  )
+  .action(async (dir: string, opts: { template?: boolean }) => {
+    await runInit(dir, opts)
   })
 
 program
