@@ -1,4 +1,11 @@
-import type { Decision, ProjectConfig } from '@agentos/shared'
+import { readFile, readdir } from 'node:fs/promises'
+import path from 'node:path'
+import {
+  type Decision,
+  type ProjectConfig,
+  ProjectConfigSchema,
+} from '@agentos/shared'
+import { parse as parseYaml } from 'yaml'
 import type { KernelConfig } from '../config.js'
 import type { EventLog } from '../log/eventLog.js'
 import type { WikiService } from '../wiki/wikiService.js'
@@ -22,8 +29,32 @@ export class AdapterHost {
     private registry: Record<string, ProjectAdapter>,
   ) {}
 
+  private expand(value: string): string {
+    return value
+      .replaceAll('${AGENTOS_HOME}', this.cfg.osRoot)
+      .replaceAll('${AGENTOS_CLONES}', path.join(this.cfg.runtimeDir, 'clones'))
+  }
+
   async loadProjects(): Promise<ProjectConfig[]> {
-    return []
+    const dir = path.join(this.cfg.osRoot, 'projects')
+    const files = await readdir(dir).catch(() => null)
+    if (!files) return []
+    const projects: ProjectConfig[] = []
+    for (const file of files.filter(
+      (f) => f.endsWith('.yaml') || f.endsWith('.yml'),
+    )) {
+      const raw = await readFile(path.join(dir, file), 'utf8')
+      const parsed = parseYaml(raw) as Record<string, unknown>
+      const expanded = {
+        ...parsed,
+        clone:
+          typeof parsed.clone === 'string'
+            ? this.expand(parsed.clone)
+            : parsed.clone,
+      }
+      projects.push(ProjectConfigSchema.parse(expanded))
+    }
+    return projects
   }
 
   async sync(projectName: string, _runId?: string): Promise<SyncResult> {
