@@ -113,6 +113,62 @@ export class WorkflowEngine {
     return this.store.steps(id)
   }
 
+  async pause(id: string): Promise<WorkflowInstance> {
+    this.requireInstance(id)
+    const updated = this.store.update(id, { status: 'paused' })
+    this.emitEvent(updated, 'workflow.paused', {})
+    return updated
+  }
+
+  async resume(id: string): Promise<WorkflowInstance> {
+    const instance = this.requireInstance(id)
+    if (instance.status !== 'paused' && instance.status !== 'failed') {
+      throw new Error(
+        `cannot resume workflow ${id} from status ${instance.status}`,
+      )
+    }
+    if (instance.status === 'failed' && instance.currentStep) {
+      this.store.resetFailedStep(id, instance.currentStep)
+    }
+    const updated = this.store.update(id, {
+      status: 'running',
+      error: undefined,
+    })
+    this.emitEvent(updated, 'workflow.resumed', {})
+    this.schedule(id)
+    return updated
+  }
+
+  async terminate(id: string): Promise<WorkflowInstance> {
+    const instance = this.requireInstance(id)
+    const current = instance.currentStep
+      ? this.store.getStep(id, instance.currentStep)
+      : undefined
+    if (current?.runId) this.pm.kill(current.runId)
+    if (
+      current &&
+      current.status !== 'succeeded' &&
+      current.status !== 'failed'
+    ) {
+      this.store.updateStep(current.id, {
+        status: 'skipped',
+        endedAt: new Date().toISOString(),
+      })
+    }
+    const updated = this.store.update(id, {
+      status: 'terminated',
+      endedAt: new Date().toISOString(),
+    })
+    this.emitEvent(updated, 'workflow.terminated', {})
+    return updated
+  }
+
+  private requireInstance(id: string): WorkflowInstance {
+    const instance = this.store.get(id)
+    if (!instance) throw new Error(`unknown workflow: ${id}`)
+    return instance
+  }
+
   private emitEvent(
     instance: WorkflowInstance,
     type: EventType,
@@ -183,6 +239,13 @@ export class WorkflowEngine {
     )
     try {
       await definition.run(ctx)
+      // definition.run() can resolve fully (every step already replayed to
+      // 'succeeded', no further step boundary left to hit checkPause) after
+      // a concurrent pause() has already landed -- e.g. a single-step
+      // workflow whose one step was already in flight when pause() was
+      // called. Don't let this completion stomp that 'paused' status back
+      // to 'succeeded'; resume() replays it and finishes on its own.
+      if (this.store.get(id)?.status === 'paused') return
       this.store.update(id, {
         status: 'succeeded',
         state: ctx.state,

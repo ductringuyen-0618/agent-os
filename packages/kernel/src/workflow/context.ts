@@ -19,6 +19,11 @@ export class WorkflowSuspended extends Error {
   }
 }
 
+function checkPause(deps: WorkflowRuntimeDeps, instanceId: string): void {
+  const current = deps.store.get(instanceId)
+  if (current?.status === 'paused') throw new WorkflowSuspended()
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -56,6 +61,7 @@ export function createWorkflowContext<I = Record<string, unknown>>(
     let row = deps.store.getStep(instance.id, name)
     if (row?.status === 'succeeded') return row.output as T
     if (!row) {
+      checkPause(deps, instance.id)
       row = deps.store.createStep(instance.id, name, mySeq)
       deps.store.update(instance.id, { currentStep: name })
       deps.onStepEvent('workflow.step.started', { step: name, seq: mySeq })
@@ -106,6 +112,7 @@ export function createWorkflowContext<I = Record<string, unknown>>(
     const row = deps.store.getStep(instance.id, name)
     if (row?.status === 'succeeded') return
     if (!row) {
+      checkPause(deps, instance.id)
       const wakeAt = new Date(Date.now() + ms).toISOString()
       deps.store.createStep(instance.id, name, mySeq, 'sleeping')
       deps.store.update(instance.id, {
@@ -143,6 +150,7 @@ export function createWorkflowContext<I = Record<string, unknown>>(
     let row = deps.store.getStep(instance.id, name)
     if (row?.status === 'succeeded') return row.output as T
     if (!row) {
+      checkPause(deps, instance.id)
       const wakeAt = new Date(Date.now() + opts.timeoutMs).toISOString()
       row = deps.store.createStep(instance.id, name, mySeq, 'waiting')
       deps.store.update(instance.id, {
@@ -200,6 +208,7 @@ export function createWorkflowContext<I = Record<string, unknown>>(
     let row = deps.store.getStep(instance.id, name)
     if (row?.status === 'succeeded') return row.output as RunResult
     if (!row) {
+      checkPause(deps, instance.id)
       row = deps.store.createStep(instance.id, name, mySeq)
       deps.store.update(instance.id, { currentStep: name })
       deps.onStepEvent('workflow.step.started', { step: name, seq: mySeq })
