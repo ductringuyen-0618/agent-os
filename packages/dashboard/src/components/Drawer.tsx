@@ -36,9 +36,9 @@ export function Drawer({
         onClick={onClose}
         className="absolute inset-0 animate-fade-in cursor-default bg-background/60 backdrop-blur-[2px]"
       />
-      {/* biome-ignore lint/a11y/useSemanticElements: a native <dialog> needs showModal(), which fights the slide-in and jsdom */}
       <div
         ref={panelRef}
+        // biome-ignore lint/a11y/useSemanticElements: a native <dialog> needs showModal(), which fights the slide-in and jsdom
         role="dialog"
         aria-modal="true"
         aria-label={title}
