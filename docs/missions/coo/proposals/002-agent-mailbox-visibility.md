@@ -1,7 +1,7 @@
 ---
-status: approved
+status: in_progress
 attempts: 0
-branch: null
+branch: coo/agent-mailbox-visibility
 ---
 # Surface the agent-to-agent mailbox in the API and dashboard
 
