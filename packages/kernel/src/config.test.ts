@@ -55,4 +55,10 @@ describe('loadKernelConfig', () => {
     expect(cfg.port).toBe(9999)
     expect(cfg.claudeBin).toBe('/bin/fake')
   })
+
+  it('falls back to 4545 when AGENTOS_PORT is non-numeric', () => {
+    process.env.AGENTOS_PORT = 'abc'
+    const cfg = loadKernelConfig('os')
+    expect(cfg.port).toBe(4545)
+  })
 })
