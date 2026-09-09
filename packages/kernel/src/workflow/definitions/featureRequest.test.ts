@@ -14,6 +14,7 @@ import {
   type FeatureRequestKernelDeps,
   createFeatureRequestCwdPolicy,
   createFeatureRequestWorkflow,
+  parsePassFail,
 } from './featureRequest.js'
 
 // @agentos/adapters is built against @agentos/kernel's PUBLISHED (dist)
@@ -533,5 +534,22 @@ describe('createFeatureRequestCwdPolicy', () => {
         { project: 'sandbox' },
       ),
     ).toThrow(/must be exactly/)
+  })
+})
+
+describe('parsePassFail', () => {
+  it('takes the first PASS/FAIL line even after narration', () => {
+    const nl = String.fromCharCode(10)
+    expect(parsePassFail(['PASS', 'all good'].join(nl)).pass).toBe(true)
+    expect(
+      parsePassFail(
+        ['Already on the branch.', '', 'PASS', '', 'checks: none'].join(nl),
+      ).pass,
+    ).toBe(true)
+    expect(
+      parsePassFail(['FAIL', '- README.md:1 remove the header'].join(nl)).pass,
+    ).toBe(false)
+    expect(parsePassFail('I ran things and they passed').pass).toBe(false)
+    expect(parsePassFail(undefined).pass).toBe(false)
   })
 })

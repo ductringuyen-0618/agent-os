@@ -150,13 +150,21 @@ function assertRunSucceeded(result: RunResult, stepName: string): void {
   }
 }
 
-function parsePassFail(resultText: string | undefined): {
+/**
+ * The verdict is the first line that is exactly PASS or FAIL. The skills
+ * are told to put it first, but an agent that narrates before the verdict
+ * must not be read as a failure.
+ */
+export function parsePassFail(resultText: string | undefined): {
   pass: boolean
   text: string
 } {
   const text = (resultText ?? '').trim()
-  const firstLine = text.split('\n', 1)[0]?.trim().toUpperCase()
-  return { pass: firstLine === 'PASS', text }
+  const verdict = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l === 'PASS' || l === 'FAIL')
+  return { pass: verdict === 'PASS', text }
 }
 
 function extractWhatWhy(proposalBody: string): string {
