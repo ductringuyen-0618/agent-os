@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: shipped
 attempts: 0
 branch: coo/routine-cost-budgets
 ---
