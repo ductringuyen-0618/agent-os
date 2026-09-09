@@ -1,3 +1,6 @@
+---
+description: Implements an approved feature request on its own branch in the project's clone, tests included.
+---
 # Skill: feature-build
 
 Trigger: workflow `feature-request`, step `build` (or `build-fix` on a

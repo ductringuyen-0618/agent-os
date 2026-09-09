@@ -5,6 +5,7 @@ export * from './types/message.js'
 export * from './types/routine.js'
 export * from './types/project.js'
 export * from './types/skill.js'
+export * from './types/wiki.js'
 export * from './types/workflow.js'
 
 export * from './types/github.js'

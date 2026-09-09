@@ -1,3 +1,6 @@
+---
+description: Turns a plain-words feature request into a proposal (what you get, why now, validation contract) ready for approval.
+---
 # Skill: feature-brief
 
 Trigger: workflow `feature-request`, step `brief`. Agent: `ops`. Runs

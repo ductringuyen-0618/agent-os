@@ -1,3 +1,6 @@
+---
+description: Writes the day's digest page from what changed in the wiki, once lint has passed.
+---
 # daily-digest
 
 Runs daily at 08:00 as agent `ops`, `permission_mode: acceptEdits`, gated by

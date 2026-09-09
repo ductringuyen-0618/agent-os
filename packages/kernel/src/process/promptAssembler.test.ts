@@ -95,3 +95,25 @@ describe('wrapUpPrompt', () => {
     expect(text).toContain('eval.json')
   })
 })
+
+describe('assemblePrompt skill file handling', () => {
+  it('finds upper-case SKILL.md and drops its description frontmatter', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'agentos-pa-'))
+    const dir = path.join(root, 'skills', 'lint')
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(
+      path.join(dir, 'SKILL.md'),
+      '---\ndescription: Nightly wiki hygiene.\n---\n# Skill: lint\n\nSteps.',
+    )
+    await fs.writeFile(path.join(dir, 'LEARNINGS.md'), '- keep index tidy')
+    const { prompt } = await assemblePrompt({
+      osRoot: root,
+      skill: 'lint',
+      agent: 'ops',
+    })
+    expect(prompt.startsWith('# Skill: lint')).toBe(true)
+    expect(prompt).not.toContain('description:')
+    expect(prompt).toContain('- keep index tidy')
+    fsSync.rmSync(root, { recursive: true, force: true })
+  })
+})

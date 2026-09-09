@@ -33,7 +33,26 @@ export function upsertIndexEntry(indexMd: string, entry: IndexEntry): string {
   } else {
     lines.push(line)
   }
-  return `${lines.join('\n').trimEnd()}\n`
+  return `${dropPlaceholder(lines).join('\n').trimEnd()}\n`
+}
+
+/**
+ * The template index ships a "(none yet ...)" bullet, possibly wrapped over
+ * indented continuation lines. Once a real entry exists it is only noise.
+ */
+function dropPlaceholder(lines: string[]): string[] {
+  const out: string[] = []
+  let skipping = false
+  for (const l of lines) {
+    if (/^- \(none yet/.test(l)) {
+      skipping = true
+      continue
+    }
+    if (skipping && /^\s+\S/.test(l)) continue
+    skipping = false
+    out.push(l)
+  }
+  return out
 }
 
 export function formatLogLine(op: string, title: string, date: string): string {

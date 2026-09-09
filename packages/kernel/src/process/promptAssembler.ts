@@ -22,6 +22,25 @@ async function readIfExists(p: string): Promise<string> {
   }
 }
 
+/**
+ * Skill folders ship SKILL.md / LEARNINGS.md; older instances wrote them
+ * lowercase. Case-insensitive filesystems mask the difference, Linux does
+ * not, so try the canonical upper-case stem first and fall back.
+ */
+async function readSkillFile(dir: string, base: string): Promise<string> {
+  const [stem, ext] = base.split(/\.(?=[^.]+$)/)
+  for (const candidate of [`${stem.toUpperCase()}.${ext}`, base]) {
+    const text = await readIfExists(path.join(dir, candidate))
+    if (text) return text
+  }
+  return ''
+}
+
+/** SKILL.md may open with a `description:` frontmatter block for the dashboard; the agent never needs it. */
+function stripFrontmatter(md: string): string {
+  return md.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '')
+}
+
 export async function assemblePrompt(
   i: AssembleInput,
 ): Promise<AssembledPrompt> {
@@ -31,12 +50,9 @@ export async function assemblePrompt(
   )
   const systemPromptAppend = [claudeMd, agentMd].filter(Boolean).join('\n\n')
 
-  const skillMd = await readIfExists(
-    path.join(i.osRoot, 'skills', i.skill, 'skill.md'),
-  )
-  const learningsMd = await readIfExists(
-    path.join(i.osRoot, 'skills', i.skill, 'learnings.md'),
-  )
+  const skillDir = path.join(i.osRoot, 'skills', i.skill)
+  const skillMd = stripFrontmatter(await readSkillFile(skillDir, 'skill.md'))
+  const learningsMd = await readSkillFile(skillDir, 'learnings.md')
   const parts = [skillMd, learningsMd]
   if (i.upstreamSkill) {
     const handoff = await readIfExists(

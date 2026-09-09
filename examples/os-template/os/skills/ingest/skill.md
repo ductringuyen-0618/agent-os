@@ -1,3 +1,6 @@
+---
+description: Folds a new or changed raw/ file into the wiki and raises a decision when it is a proposal.
+---
 # Skill: ingest
 
 Trigger: routine `ingest`, `on: [raw.added]`. Agent: `librarian`.

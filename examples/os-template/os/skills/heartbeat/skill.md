@@ -1,3 +1,6 @@
+---
+description: Cheap, frequent pulse-check across the OS: stale routines, failed runs, pending decisions.
+---
 # heartbeat
 
 Cheap, frequent pulse-check across the OS. Runs every 30 minutes as agent `ops` on model `haiku`.
