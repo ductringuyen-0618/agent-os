@@ -19,6 +19,18 @@ function nowIso(): string {
   return new Date().toISOString()
 }
 
+/**
+ * nanoid's default alphabet can produce a leading '-', which commander (used
+ * by the CLI's `approve <id>`/`reject <id>`/`logs <runId>` etc.) misparses as
+ * an unknown flag when passed positionally. Regenerate on that rare case
+ * instead so every id this module hands out is safe as a bare CLI argument.
+ */
+function genId(): string {
+  let id = nanoid()
+  while (id.startsWith('-')) id = nanoid()
+  return id
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: raw better-sqlite3 rows
 function rowToRun(row: any): Run {
   return {
@@ -121,7 +133,7 @@ export class EventLog {
   createRun(
     r: Omit<Run, 'id' | 'status' | 'attempt'> & { attempt?: number },
   ): Run {
-    const id = nanoid()
+    const id = genId()
     const attempt = r.attempt ?? 1
     this.db
       .prepare(
@@ -242,7 +254,7 @@ export class EventLog {
   }
 
   createDecision(d: Omit<Decision, 'id' | 'status' | 'createdAt'>): Decision {
-    const id = nanoid()
+    const id = genId()
     const createdAt = nowIso()
     this.db
       .prepare(
@@ -298,7 +310,7 @@ export class EventLog {
   }
 
   sendMessage(m: Omit<Message, 'id' | 'ts'>): Message {
-    const id = nanoid()
+    const id = genId()
     const ts = nowIso()
     this.db
       .prepare(
@@ -348,7 +360,7 @@ export class EventLog {
     whenAt: string
     payload?: Record<string, unknown>
   }): { id: string } {
-    const id = nanoid()
+    const id = genId()
     this.db
       .prepare(
         'INSERT INTO schedules (id, skill, when_at, payload) VALUES (?, ?, ?, ?)',
