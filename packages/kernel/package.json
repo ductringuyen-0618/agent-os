@@ -8,10 +8,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./adapters/types": {
+      "types": "./dist/adapters/types.d.ts",
+      "import": "./dist/adapters/types.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --out-dir dist && tsup src/syscall/bin.ts --format esm --out-dir dist/syscall --clean=false && node -e \"require('fs').copyFileSync('src/log/schema.sql','dist/schema.sql')\"",
+    "build": "tsup src/index.ts --format esm --dts --out-dir dist && tsup src/syscall/bin.ts --format esm --out-dir dist/syscall --clean=false && tsup src/adapters/types.ts --format esm --dts --out-dir dist/adapters --clean=false && node -e \"require('fs').copyFileSync('src/log/schema.sql','dist/schema.sql')\"",
     "test": "vitest run"
   },
   "dependencies": {
