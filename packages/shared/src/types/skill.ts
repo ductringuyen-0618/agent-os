@@ -1,10 +1,10 @@
 export interface EvalCriteria {
-  criteria: Array<{ key: string; weight: number; description: string }>;
+  criteria: Array<{ key: string; weight: number; description: string }>
 }
 
 export interface SkillMeta {
-  name: string;
-  path: string;
-  hasLearnings: boolean;
-  lastScore?: number;
+  name: string
+  path: string
+  hasLearnings: boolean
+  lastScore?: number
 }
