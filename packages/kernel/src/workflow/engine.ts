@@ -41,9 +41,42 @@ export class WorkflowEngine {
     this.maxConcurrent = maxConcurrent ?? DEFAULT_MAX_CONCURRENT
   }
 
-  // -- filled in by Task 7 --
-  start(): void {}
-  stop(): void {}
+  private alarmHandle?: NodeJS.Timeout
+  private unsubscribe?: () => void
+
+  start(): void {
+    this.unsubscribe = this.log.subscribe((e) => this.onEvent(e))
+    this.alarmHandle = setInterval(() => this.tick(), 5_000)
+    for (const inst of [
+      ...this.store.list({ status: 'running' }),
+      ...this.store.list({ status: 'waiting' }),
+      ...this.store.list({ status: 'sleeping' }),
+    ]) {
+      this.schedule(inst.id)
+    }
+  }
+
+  stop(): void {
+    this.unsubscribe?.()
+    if (this.alarmHandle) clearInterval(this.alarmHandle)
+  }
+
+  private onEvent(e: Event): void {
+    for (const inst of this.store.list({ status: 'waiting' })) {
+      if (inst.waitEvent === e.type) this.schedule(inst.id)
+    }
+  }
+
+  private tick(): void {
+    const now = Date.now()
+    for (const inst of [
+      ...this.store.list({ status: 'sleeping' }),
+      ...this.store.list({ status: 'waiting' }),
+    ]) {
+      if (inst.wakeAt && now >= new Date(inst.wakeAt).getTime())
+        this.schedule(inst.id)
+    }
+  }
 
   async create(
     kind: string,

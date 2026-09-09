@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { KernelConfig } from '../../src/config.js'
 import { EventLog } from '../../src/log/eventLog.js'
 import { ProcessManager } from '../../src/process/processManager.js'
@@ -98,5 +98,85 @@ describe('WorkflowEngine core', () => {
       instance.id,
     )
     expect(engine.steps(instance.id).map((s) => s.name)).toEqual(['a'])
+  })
+})
+
+describe('WorkflowEngine wake-ups', () => {
+  it('wakes a sleeping instance once its wakeAt has passed via the 5s alarm tick', async () => {
+    vi.useFakeTimers()
+    const { engine } = makeEngine()
+    const def: WorkflowDefinition = {
+      kind: 'napper',
+      async run(ctx) {
+        await ctx.step.sleep('nap', 8_000)
+        ctx.state.woke = true
+      },
+    }
+    engine.registry.register(def)
+    engine.start()
+
+    const instance = await engine.create('napper', {})
+    await vi.advanceTimersByTimeAsync(1)
+    expect(engine.get(instance.id)?.status).toBe('sleeping')
+
+    await vi.advanceTimersByTimeAsync(10_000) // past wakeAt, at least one 5s alarm tick
+    expect(engine.get(instance.id)?.status).toBe('succeeded')
+    expect(engine.get(instance.id)?.state.woke).toBe(true)
+    engine.stop()
+    vi.useRealTimers()
+  })
+
+  it('wakes a waiting instance as soon as a matching event is appended', async () => {
+    const { engine, log } = makeEngine()
+    const def: WorkflowDefinition = {
+      kind: 'waiter',
+      async run(ctx) {
+        const payload = await ctx.step.waitForEvent<{ approved: boolean }>(
+          'gate',
+          'decision.resolved',
+          { timeoutMs: 60_000 },
+        )
+        ctx.state.approved = payload.approved
+      },
+    }
+    engine.registry.register(def)
+    engine.start()
+
+    const instance = await engine.create('waiter', {})
+    await new Promise((r) => setTimeout(r, 10))
+    expect(engine.get(instance.id)?.status).toBe('waiting')
+
+    log.append({ type: 'decision.resolved', payload: { approved: true } })
+    await new Promise((r) => setTimeout(r, 10))
+
+    expect(engine.get(instance.id)?.status).toBe('succeeded')
+    expect(engine.get(instance.id)?.state.approved).toBe(true)
+    engine.stop()
+  })
+
+  it('resumes running|waiting|sleeping instances on start() (boot recovery)', async () => {
+    const { engine, log } = makeEngine()
+    const def: WorkflowDefinition = {
+      kind: 'resumable',
+      async run(ctx) {
+        await ctx.step.do('step-a', {}, async () => 'a')
+      },
+    }
+    engine.registry.register(def)
+    const stuck = log.createWorkflow({
+      kind: 'resumable',
+      title: 't',
+      input: {},
+    })
+    log.updateWorkflow(stuck.id, {
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    })
+
+    engine.start()
+    await new Promise((r) => setTimeout(r, 20))
+
+    expect(engine.get(stuck.id)?.status).toBe('succeeded')
+    engine.stop()
   })
 })
