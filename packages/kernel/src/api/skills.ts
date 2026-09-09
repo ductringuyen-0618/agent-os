@@ -41,9 +41,9 @@ export function skillDescription(skillMd: string, max = 220): string {
   if (fm) {
     const m = /^description:\s*(.+)$/m.exec(fm[1])
     if (m) return m[1].trim().replace(/^["']|["']$/g, '')
-    skillMd = skillMd.slice(fm[0].length)
   }
-  const lines = skillMd.split(/\r?\n/)
+  const body = fm ? skillMd.slice(fm[0].length) : skillMd
+  const lines = body.split(/\r?\n/)
   let i = 0
   let text = ''
   // Walk paragraph by paragraph; a "Trigger: ..." line is wiring, not a

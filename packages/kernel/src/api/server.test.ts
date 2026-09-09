@@ -359,11 +359,11 @@ describe('api/server runs routes', () => {
     const wikiLog = await app.inject({ method: 'GET', url: '/api/wiki/log' })
     expect(wikiLog.json().content).toContain('ingest | overview')
 
-    const escape = await app.inject({
+    const outside = await app.inject({
       method: 'GET',
       url: '/api/wiki/page?path=../secret.md',
     })
-    expect(escape.statusCode).toBe(404)
+    expect(outside.statusCode).toBe(404)
     const missing = await app.inject({
       method: 'GET',
       url: '/api/wiki/page?path=nope.md',
