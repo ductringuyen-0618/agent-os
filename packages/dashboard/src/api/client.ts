@@ -65,11 +65,7 @@ export class ApiClient {
     const text = await res.text();
     const data = text ? JSON.parse(text) : undefined;
     if (!res.ok)
-      throw new ApiError(
-        res.status,
-        (data && data.error) || res.statusText,
-        data,
-      );
+      throw new ApiError(res.status, data?.error || res.statusText, data);
     return data as T;
   }
 

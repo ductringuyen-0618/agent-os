@@ -7,6 +7,7 @@ export function ErrorState({
       <div className="text-sm text-danger">{message}</div>
       {onRetry && (
         <button
+          type="button"
           onClick={onRetry}
           className="rounded border border-border px-3 py-1 text-xs text-text hover:border-accent"
         >

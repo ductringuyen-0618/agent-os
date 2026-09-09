@@ -32,27 +32,28 @@ export function useEvents(
   filterRef.current = filter;
 
   useEffect(() => {
-    let cancelled = false;
+    let disposed = false;
     let retryMs = 1000;
-    let socket: WebSocket;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     function connect() {
-      socket = new WebSocket(wsUrl());
+      if (disposed) return;
+      const socket = new WebSocket(wsUrl());
       wsRef.current = socket;
       socket.onopen = () => {
-        if (!cancelled) {
-          setConnected(true);
-          retryMs = 1000;
-        }
+        if (disposed) return;
+        setConnected(true);
+        retryMs = 1000;
       };
       socket.onclose = () => {
-        if (cancelled) return;
+        if (disposed) return;
         setConnected(false);
-        setTimeout(connect, retryMs);
+        reconnectTimer = setTimeout(connect, retryMs);
         retryMs = Math.min(retryMs * 2, 15000);
       };
       socket.onerror = () => socket.close();
       socket.onmessage = (msg: { data: string }) => {
+        if (disposed) return;
         try {
           const e = JSON.parse(msg.data) as Event;
           if (filterRef.current && !filterRef.current(e)) return;
@@ -69,7 +70,8 @@ export function useEvents(
     }
     connect();
     return () => {
-      cancelled = true;
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       wsRef.current?.close();
     };
   }, [maxBuffer]);

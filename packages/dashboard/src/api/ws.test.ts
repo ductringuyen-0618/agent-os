@@ -18,4 +18,34 @@ describe("useEvents", () => {
     );
     await waitFor(() => expect(result.current.events).toHaveLength(1));
   });
+
+  it("stops reconnecting once unmounted", async () => {
+    vi.useFakeTimers();
+    try {
+      const { result, unmount } = renderHook(() => useEvents());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(result.current.connected).toBe(true);
+      expect(MockWebSocket.instances).toHaveLength(1);
+
+      // server drops the connection; a reconnect timer is now pending
+      const socket = MockWebSocket.instances[0];
+      act(() => {
+        socket.readyState = 3;
+        socket.onclose?.();
+      });
+
+      unmount();
+
+      // advance well past the reconnect delay
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(MockWebSocket.instances).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
