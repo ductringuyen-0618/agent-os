@@ -311,6 +311,21 @@ export class EventLog {
     return messages
   }
 
+  createRunToken(runId: string, token: string): void {
+    this.db
+      .prepare('INSERT INTO run_tokens (run_id, token) VALUES (?, ?)')
+      .run(runId, token)
+  }
+
+  getRunByToken(token: string): Run | undefined {
+    const row = this.db
+      .prepare(
+        'SELECT r.* FROM runs r JOIN run_tokens t ON t.run_id = r.id WHERE t.token = ?',
+      )
+      .get(token)
+    return row ? rowToRun(row) : undefined
+  }
+
   subscribe(cb: (e: Event) => void): () => void {
     this.subscribers.add(cb)
     return () => this.subscribers.delete(cb)
