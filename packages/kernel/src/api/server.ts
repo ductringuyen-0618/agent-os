@@ -1,3 +1,6 @@
+import fsp from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type {
   CreateRunRequest,
   CreateRunResponse,
@@ -6,12 +9,36 @@ import type {
   HealthResponse,
   KillRunResponse,
 } from '@agentos/shared'
+import fastifyStatic from '@fastify/static'
 import fastifyWebsocket from '@fastify/websocket'
 import Fastify, { type FastifyInstance } from 'fastify'
 import type { Kernel } from '../kernel.js'
 import { registerInternalRoutes } from './internal.js'
 
 const VERSION = '0.1.0'
+
+const dashboardDist = path.resolve(
+  fileURLToPath(import.meta.url),
+  '../../../../dashboard/dist',
+)
+
+async function listSubdirs(dir: string): Promise<string[]> {
+  try {
+    const entries = await fsp.readdir(dir, { withFileTypes: true })
+    return entries.filter((e) => e.isDirectory()).map((e) => e.name)
+  } catch {
+    return []
+  }
+}
+
+async function fileExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p)
+    return true
+  } catch {
+    return false
+  }
+}
 
 export function buildServer(kernel: Kernel): FastifyInstance {
   const { cfg, log, pm, wiki, scheduler } = kernel
@@ -179,11 +206,110 @@ export function buildServer(kernel: Kernel): FastifyInstance {
     },
   )
 
+  app.get('/api/skills', async () => {
+    const skillsDir = path.join(cfg.osRoot, 'skills')
+    const names = await listSubdirs(skillsDir)
+    return Promise.all(
+      names.map(async (name) => ({
+        name,
+        path: `skills/${name}`,
+        hasLearnings: await fileExists(
+          path.join(skillsDir, name, 'learnings.md'),
+        ),
+      })),
+    )
+  })
+
+  app.get('/api/skills/:name', async (req, reply) => {
+    const { name } = req.params as { name: string }
+    const dir = path.join(cfg.osRoot, 'skills', name)
+    if (!(await fileExists(dir)))
+      return reply
+        .code(404)
+        .send({ error: 'skill not found' } satisfies ErrorResponse)
+    const readOptional = async (file: string) => {
+      try {
+        return await fsp.readFile(path.join(dir, file), 'utf8')
+      } catch {
+        return ''
+      }
+    }
+    const [skillMd, learningsMd, evalRaw, lastOutputMd] = await Promise.all([
+      readOptional('skill.md'),
+      readOptional('learnings.md'),
+      readOptional('eval.json'),
+      readOptional('last-output.md'),
+    ])
+    return {
+      skillMd,
+      learningsMd,
+      eval: evalRaw ? JSON.parse(evalRaw) : { criteria: [] },
+      lastOutputMd,
+    }
+  })
+
+  app.get('/api/agents', async () => {
+    const agentsDir = path.join(cfg.osRoot, 'agents')
+    const names = await listSubdirs(agentsDir)
+    const runs = log.listRuns()
+    return names.map((name) => {
+      const active = runs.find(
+        (r) =>
+          r.agent === name &&
+          (r.status === 'running' ||
+            r.status === 'wrapping_up' ||
+            r.status === 'blocked'),
+      )
+      if (!active) return { name, status: 'idle' as const }
+      return {
+        name,
+        status: (active.status === 'blocked' ? 'blocked' : 'working') as
+          | 'blocked'
+          | 'working',
+        currentRun: active.id,
+      }
+    })
+  })
+
+  app.get('/api/costs', async (req) => {
+    const { days } = req.query as { days?: string }
+    const windowMs = (days ? Number(days) : 14) * 24 * 60 * 60 * 1000
+    const since = new Date(Date.now() - windowMs).toISOString()
+    return log
+      .listRuns()
+      .filter(
+        (r) =>
+          r.startedAt !== undefined &&
+          r.startedAt >= since &&
+          r.costUsd !== undefined,
+      )
+      .map((r) => ({
+        // biome-ignore lint/style/noNonNullAssertion: filtered above
+        day: r.startedAt!.slice(0, 10),
+        agent: r.agent ?? r.routine,
+        costUsd: r.costUsd ?? 0,
+      }))
+  })
+
   app.get('/ws', { websocket: true }, (socket) => {
     const unsubscribe = log.subscribe((event) => {
       socket.send(JSON.stringify(event))
     })
     socket.on('close', unsubscribe)
+  })
+
+  app.register(fastifyStatic, {
+    root: dashboardDist,
+    prefix: '/',
+    wildcard: false,
+  })
+
+  app.setNotFoundHandler((req, reply) => {
+    if (req.raw.url?.startsWith('/api') || req.raw.url?.startsWith('/ws')) {
+      reply.code(404).send({ error: 'not found' } satisfies ErrorResponse)
+      return
+    }
+    reply.sendFile('index.html', dashboardDist)
   })
 
   return app

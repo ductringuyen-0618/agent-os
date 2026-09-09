@@ -226,4 +226,66 @@ describe('api/server runs routes', () => {
 
     await app.close()
   })
+
+  it('serves the built dashboard at /', async () => {
+    const cfg = loadKernelConfig(osRoot, {
+      claudeBin: fakeClaudeBin,
+      runtimeDir: path.join(tmpDir, '.agentos'),
+      dbPath: path.join(tmpDir, '.agentos', 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    const app = buildServer({ cfg, log, pm } as unknown as Kernel)
+    const res = await app.inject({ method: 'GET', url: '/' })
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toMatch(/text\/html/)
+    await app.close()
+  })
+
+  it('lists skills and agents from the os/ directory', async () => {
+    const cfg = loadKernelConfig(osRoot, {
+      claudeBin: fakeClaudeBin,
+      runtimeDir: path.join(tmpDir, '.agentos'),
+      dbPath: path.join(tmpDir, '.agentos', 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    const app = buildServer({ cfg, log, pm } as unknown as Kernel)
+
+    const skills = await app.inject({ method: 'GET', url: '/api/skills' })
+    expect(skills.json()).toEqual([
+      { name: 'heartbeat', path: 'skills/heartbeat', hasLearnings: false },
+    ])
+
+    const agents = await app.inject({ method: 'GET', url: '/api/agents' })
+    expect(agents.json()).toEqual([{ name: 'ops', status: 'idle' }])
+
+    await app.close()
+  })
+
+  it('returns costs for recent runs within the window', async () => {
+    const cfg = loadKernelConfig(osRoot, {
+      claudeBin: fakeClaudeBin,
+      runtimeDir: path.join(tmpDir, '.agentos'),
+      dbPath: path.join(tmpDir, '.agentos', 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    const app = buildServer({ cfg, log, pm } as unknown as Kernel)
+
+    const run = log.createRun({ routine: 'heartbeat', agent: 'ops' })
+    log.updateRun(run.id, {
+      status: 'success',
+      startedAt: new Date().toISOString(),
+      costUsd: 0.05,
+    })
+
+    const res = await app.inject({ method: 'GET', url: '/api/costs?days=1' })
+    expect(res.json()).toEqual([
+      {
+        day: new Date().toISOString().slice(0, 10),
+        agent: 'ops',
+        costUsd: 0.05,
+      },
+    ])
+
+    await app.close()
+  })
 })
