@@ -197,16 +197,42 @@ export class Scheduler {
     }
   }
 
-  // -- filled in by later tasks --
-  private tick(): void {}
-  private recoverFromRestart(): void {}
   scheduleOnce(
-    _skill: string,
-    _when: Date,
-    _payload?: Record<string, unknown>,
+    skill: string,
+    when: Date,
+    payload?: Record<string, unknown>,
   ): string {
-    throw new Error('not implemented until Task 4')
+    return this.log.createSchedule({
+      skill,
+      whenAt: when.toISOString(),
+      payload,
+    }).id
   }
+
+  private resolveAdhocRoutine(skill: string): RoutineConfig {
+    for (const lr of this.routines.values()) {
+      if (lr.config.skill === skill) return lr.config
+    }
+    return { name: `adhoc-${skill}`, skill, agent: 'ops' }
+  }
+
+  private processDueSchedules(): void {
+    const due = this.log.dueSchedules(new Date().toISOString())
+    for (const s of due) {
+      this.log.markScheduleFired(s.id, new Date().toISOString())
+      this.runRoutine(this.resolveAdhocRoutine(s.skill), s.payload).catch(
+        () => {},
+      )
+    }
+  }
+
+  // -- filled in by later tasks --
+  private tick(): void {
+    this.processDueSchedules()
+    this.checkMissedRoutines() // filled in Task 5
+  }
+  private checkMissedRoutines(): void {}
+  private recoverFromRestart(): void {}
   setEnabled(_name: string, _enabled: boolean): void {
     throw new Error('not implemented until Task 6')
   }
