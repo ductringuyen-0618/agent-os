@@ -1,13 +1,20 @@
 import type {
+  CreateWorkflowRequest,
+  CreateWorkflowResponse,
   Decision,
   DecisionStatus,
+  DeliverWorkflowEventRequest,
   EvalCriteria,
   Event,
+  GetWorkflowResponse,
+  ListWorkflowsQuery,
   Message,
+  ProjectConfig,
   RoutineConfig,
   Run,
   RunStatus,
   SkillMeta,
+  WorkflowInstance,
 } from '@agentos/shared'
 
 export class ApiError extends Error {
@@ -163,5 +170,39 @@ export class ApiClient {
       'GET',
       `/api/messages${limit ? `?limit=${limit}` : ''}`,
     )
+  }
+
+  listWorkflows(opts: ListWorkflowsQuery = {}) {
+    const qs = new URLSearchParams(opts as Record<string, string>).toString()
+    return this.req<WorkflowInstance[]>(
+      'GET',
+      `/api/workflows${qs ? `?${qs}` : ''}`,
+    )
+  }
+  getWorkflow(id: string) {
+    return this.req<GetWorkflowResponse>('GET', `/api/workflows/${id}`)
+  }
+  createWorkflow(body: CreateWorkflowRequest) {
+    return this.req<CreateWorkflowResponse>('POST', '/api/workflows', body)
+  }
+  pauseWorkflow(id: string) {
+    return this.req<WorkflowInstance>('POST', `/api/workflows/${id}/pause`)
+  }
+  resumeWorkflow(id: string) {
+    return this.req<WorkflowInstance>('POST', `/api/workflows/${id}/resume`)
+  }
+  terminateWorkflow(id: string) {
+    return this.req<WorkflowInstance>('POST', `/api/workflows/${id}/terminate`)
+  }
+  sendWorkflowEvent(id: string, event: DeliverWorkflowEventRequest) {
+    return this.req<{ id: number }>(
+      'POST',
+      `/api/workflows/${id}/events`,
+      event,
+    )
+  }
+
+  listProjects() {
+    return this.req<ProjectConfig[]>('GET', '/api/projects')
   }
 }
