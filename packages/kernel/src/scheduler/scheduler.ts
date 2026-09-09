@@ -32,7 +32,10 @@ export class Scheduler {
     // no-op until M3
   }
 
-  async runNow(name: string): Promise<string> {
+  async runNow(
+    name: string,
+    _payload?: Record<string, unknown>,
+  ): Promise<string> {
     throw new Error(`Scheduler.runNow('${name}') is not implemented until M3`)
   }
 
@@ -40,7 +43,11 @@ export class Scheduler {
     // no-op until M3
   }
 
-  scheduleOnce(_skill: string, _when: Date): string {
+  scheduleOnce(
+    _skill: string,
+    _when: Date,
+    _payload?: Record<string, unknown>,
+  ): string {
     throw new Error('Scheduler.scheduleOnce is not implemented until M3')
   }
 

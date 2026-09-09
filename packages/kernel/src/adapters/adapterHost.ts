@@ -23,7 +23,7 @@ export class AdapterHost {
     return []
   }
 
-  async sync(projectName: string): Promise<SyncResult> {
+  async sync(projectName: string, _runId?: string): Promise<SyncResult> {
     throw new Error(
       `AdapterHost.sync('${projectName}') is not implemented until M4`,
     )

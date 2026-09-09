@@ -5,6 +5,7 @@ import {
   type CreateRunResponse,
   type ErrorResponse,
   type HealthResponse,
+  type KillRunResponse,
   type RoutineConfig,
   type RoutinesFile,
   parseRoutinesFile,
@@ -136,7 +137,7 @@ export function buildServer(kernel: Kernel): FastifyInstance {
     const workspace = path.join(cfg.osRoot, 'agents', agent, 'workspace')
     await fs.mkdir(workspace, { recursive: true })
 
-    void pm.start(run, {
+    pm.start(run, {
       prompt,
       systemPromptAppend,
       cwd: workspace,
@@ -147,6 +148,17 @@ export function buildServer(kernel: Kernel): FastifyInstance {
       addDirs: [cfg.osRoot],
       mcpConfigPath,
       timeoutMs: routine?.timeout_ms ?? routines.defaults.timeout_ms,
+    }).catch((err: unknown) => {
+      // pm.start() only rejects on a bug (e.g. a synchronous throw before
+      // its first await) since normal subprocess failure resolves with
+      // status 'failed'/'killed'. Without this catch, that rejection would
+      // be unhandled and crash the whole daemon process for one bad run.
+      app.log.error({ err, runId: run.id }, 'pm.start() rejected')
+      log.updateRun(run.id, {
+        status: 'failed',
+        endedAt: new Date().toISOString(),
+        error: err instanceof Error ? err.message : String(err),
+      })
     })
 
     return reply.code(202).send({ runId: run.id } satisfies CreateRunResponse)
@@ -154,7 +166,7 @@ export function buildServer(kernel: Kernel): FastifyInstance {
 
   app.post('/api/runs/:id/kill', async (req) => {
     const { id } = req.params as { id: string }
-    return { ok: pm.kill(id) }
+    return { ok: pm.kill(id) } satisfies KillRunResponse
   })
 
   app.get('/ws', { websocket: true }, (socket) => {
