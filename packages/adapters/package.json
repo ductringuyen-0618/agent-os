@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
     "test": "vitest run",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@agentos/kernel": "workspace:*",

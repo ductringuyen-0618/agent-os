@@ -5,7 +5,8 @@
   "bin": { "agentos": "./dist/bin.js" },
   "scripts": {
     "build": "tsup src/bin.ts --format esm --dts --out-dir dist",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@agentos/shared": "workspace:*",

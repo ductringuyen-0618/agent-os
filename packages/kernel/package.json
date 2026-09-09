@@ -16,7 +16,8 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --out-dir dist && tsup src/syscall/bin.ts --format esm --out-dir dist/syscall --clean=false && node -e \"const fs=require('fs'); fs.mkdirSync('dist/adapters',{recursive:true}); fs.writeFileSync('dist/adapters/types.js', \\\"export * from '../index.js'\\\\n\\\"); fs.writeFileSync('dist/adapters/types.d.ts', \\\"export * from '../index.js'\\\\n\\\")\" && node -e \"require('fs').copyFileSync('src/log/schema.sql','dist/schema.sql')\"",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@agentos/shared": "workspace:*",
