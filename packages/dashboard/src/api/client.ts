@@ -1,9 +1,12 @@
 import type {
+  AddProjectResponse,
   Decision,
   DecisionStatus,
   EvalCriteria,
   Event,
+  GithubRepo,
   Message,
+  ProjectListItem,
   RoutineConfig,
   Run,
   RunStatus,
@@ -162,6 +165,34 @@ export class ApiClient {
     return this.req<Message[]>(
       'GET',
       `/api/messages${limit ? `?limit=${limit}` : ''}`,
+    )
+  }
+
+  listGithubRepos(query?: string) {
+    return this.req<GithubRepo[]>(
+      'GET',
+      `/api/github/repos${query ? `?query=${encodeURIComponent(query)}` : ''}`,
+    )
+  }
+  listProjects() {
+    return this.req<ProjectListItem[]>('GET', '/api/projects')
+  }
+  addProject(input: {
+    repo: string
+    name?: string
+    adapter?: string
+    base_branch?: string
+    build?: boolean
+  }) {
+    return this.req<AddProjectResponse>('POST', '/api/projects', input)
+  }
+  removeProject(name: string) {
+    return this.req<{ ok: true }>('DELETE', `/api/projects/${name}`)
+  }
+  syncProject(name: string) {
+    return this.req<{ added: string[]; changed: string[]; events: string[] }>(
+      'POST',
+      `/api/projects/${name}/sync`,
     )
   }
 }

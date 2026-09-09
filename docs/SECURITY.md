@@ -66,6 +66,22 @@ nothing else.
   gitleaks action on every push to `main`, every `v*` tag, and every
   pull request into `main`.
 
+## The `gh` CLI
+Everything agent-os knows about GitHub — the operator's repo list, a
+project's default branch, and the presence of `package.json`/
+`pyproject.toml`/`Makefile` used to infer build checks — comes from
+shelling out to the operator's own `gh` CLI (`packages/kernel/src/github/gh.ts`),
+never from a stored token. Every call goes through `execa(bin, [...args])`
+with an argument array — never a shell string — and every repo name is
+checked against `^[\w.-]+\/[\w.-]+$` (`assertValidRepoName`) before it is
+used in an argv element or a filesystem path segment. `gh`'s own local
+login (`gh auth login`, outside agent-os entirely) is the only credential
+involved; if it isn't present, `GET /api/github/repos` and `POST
+/api/projects` return `503 { error: 'gh not available', hint }` rather
+than failing partway through. Tests and CI never touch the real `gh`
+binary — `AGENTOS_GH_BIN` points them at `tools/fake-gh/bin.js`, a
+fixture-driven stand-in with the same shape as `tools/fake-claude`.
+
 ## Local secret scanning
 This repo does not ship an automated pre-commit hook. Before committing,
 run gitleaks yourself against your staged changes:

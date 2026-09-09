@@ -15,6 +15,7 @@ import { EventLog } from './log/eventLog.js'
 import { writeRunMcpConfig } from './process/mcpConfig.js'
 import { ProcessManager } from './process/processManager.js'
 import { assemblePrompt } from './process/promptAssembler.js'
+import { ProjectService } from './projects/projectService.js'
 import { Scheduler } from './scheduler/scheduler.js'
 import { WikiService } from './wiki/wikiService.js'
 import { WorkflowEngine } from './workflow/engine.js'
@@ -31,6 +32,7 @@ export interface Kernel {
   wiki: WikiService
   adapters: AdapterHost
   workflows: WorkflowEngine
+  projects: ProjectService
   start(): Promise<void>
   stop(): Promise<void>
 }
@@ -47,6 +49,7 @@ class KernelImpl implements Kernel {
   wiki: WikiService
   adapters: AdapterHost
   workflows: WorkflowEngine
+  projects: ProjectService
   private server: FastifyInstance | undefined
   private routinesFile: RoutinesFile | undefined
 
@@ -65,6 +68,12 @@ class KernelImpl implements Kernel {
     )
     this.workflows = new WorkflowEngine(cfg, this.log, this.pm, cwdPolicy)
     for (const def of workflowDefinitions) this.workflows.registry.register(def)
+    this.projects = new ProjectService(
+      cfg,
+      this.adapters,
+      this.scheduler,
+      this.log,
+    )
   }
 
   private async exec(

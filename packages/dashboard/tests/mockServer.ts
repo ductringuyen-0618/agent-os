@@ -1,7 +1,9 @@
 import type {
   Decision,
   Event,
+  GithubRepo,
   Message,
+  ProjectListItem,
   RoutineConfig,
   Run,
   SkillMeta,
@@ -45,6 +47,27 @@ export const fixtures = {
     body: 'wiki looks stale, can you re-sync?',
     ts: '2026-09-08T00:00:00Z',
   } satisfies Message,
+  githubRepos: [
+    {
+      nameWithOwner: 'octo/widgets',
+      description: 'Widget factory',
+      defaultBranch: 'main',
+      isPrivate: false,
+      updatedAt: '2026-09-01T00:00:00Z',
+    },
+  ] satisfies GithubRepo[],
+  projectListItem: {
+    config: {
+      name: 'techpulse',
+      adapter: 'techpulse-coo',
+      repo: 'octo/techpulse',
+      clone: '/clones/techpulse',
+      base_branch: 'main',
+      options: {},
+    },
+    routines: ['techpulse-sync'],
+    hasCooLayout: true,
+  } satisfies ProjectListItem,
 }
 
 type Handler = (url: URL, init?: RequestInit) => unknown
@@ -88,6 +111,21 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
       { day: '2026-09-08', agent: 'ops', costUsd: 0.42 },
     ],
     'GET /api/messages': () => [fixtures.message],
+    'GET /api/github/repos': () => fixtures.githubRepos,
+    'GET /api/projects': () => [fixtures.projectListItem],
+    'POST /api/projects': () => ({
+      project: {
+        name: 'widgets',
+        adapter: 'techpulse-coo',
+        repo: 'octo/widgets',
+        clone: '/clones/widgets',
+        base_branch: 'main',
+        options: {},
+      },
+      sync: { added: [], changed: [], events: [], hasCooLayout: false },
+    }),
+    'DELETE /api/projects/widgets': () => ({ ok: true }),
+    'DELETE /api/projects/techpulse': () => ({ ok: true }),
     ...overrides,
   }
   vi.stubGlobal(
@@ -101,6 +139,7 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
           status: 404,
         })
       const body = handler(url, init)
+      if (body instanceof Response) return body
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'content-type': 'application/json' },

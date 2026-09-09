@@ -1,0 +1,16 @@
+[
+  {
+    "nameWithOwner": "octo/widgets",
+    "description": "Widget factory",
+    "defaultBranchRef": { "name": "main" },
+    "isPrivate": false,
+    "updatedAt": "2026-09-01T00:00:00Z"
+  },
+  {
+    "nameWithOwner": "octo/gadgets",
+    "description": null,
+    "defaultBranchRef": { "name": "trunk" },
+    "isPrivate": true,
+    "updatedAt": "2026-08-15T00:00:00Z"
+  }
+]

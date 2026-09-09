@@ -1,11 +1,14 @@
 import type { SyncResult } from '@agentos/kernel/adapters/types'
 import type {
+  AddProjectRequest,
+  AddProjectResponse,
   CreateRunRequest,
   CreateRunResponse,
   Decision,
   DecisionStatus,
   Event,
   HealthResponse,
+  ProjectListItem,
   RoutineConfig,
   Run,
   WorkflowInstance,
@@ -157,5 +160,15 @@ export class ApiClient {
 
   terminateWorkflow(id: string): Promise<WorkflowInstance> {
     return this.request(`/api/workflows/${id}/terminate`, { method: 'POST' })
+  }
+  listProjects(): Promise<ProjectListItem[]> {
+    return this.request('/api/projects')
+  }
+
+  addProject(input: AddProjectRequest): Promise<AddProjectResponse> {
+    return this.request('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
   }
 }

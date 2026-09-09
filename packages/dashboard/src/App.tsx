@@ -5,6 +5,7 @@ import { CostsPanel } from './panels/CostsPanel'
 import { DecisionsPanel } from './panels/DecisionsPanel'
 import { MessagesPanel } from './panels/MessagesPanel'
 import { OverviewPanel } from './panels/OverviewPanel'
+import { ProjectsPanel } from './panels/ProjectsPanel'
 import { RoutinesPanel } from './panels/RoutinesPanel'
 import { RunsPanel } from './panels/RunsPanel'
 import { SkillsPanel } from './panels/SkillsPanel'
@@ -18,6 +19,7 @@ export type PanelName =
   | 'skills'
   | 'routines'
   | 'costs'
+  | 'projects'
   | 'messages'
 
 const NAV: Array<{ id: PanelName; label: string; icon: IconName }> = [
@@ -28,6 +30,7 @@ const NAV: Array<{ id: PanelName; label: string; icon: IconName }> = [
   { id: 'skills', label: 'Skills', icon: 'skills' },
   { id: 'routines', label: 'Routines', icon: 'routines' },
   { id: 'costs', label: 'Costs', icon: 'costs' },
+  { id: 'projects', label: 'Projects', icon: 'projects' },
   { id: 'messages', label: 'Messages', icon: 'messages' },
 ]
 
@@ -76,6 +79,9 @@ export default function App() {
       break
     case 'costs':
       panel = <CostsPanel />
+      break
+    case 'projects':
+      panel = <ProjectsPanel />
       break
     case 'messages':
       panel = <MessagesPanel />

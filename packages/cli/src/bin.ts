@@ -5,6 +5,7 @@ import { registerApprove } from './commands/approve.js'
 import { registerDecisions } from './commands/decisions.js'
 import { runInit } from './commands/init.js'
 import { logs } from './commands/logs.js'
+import { registerProjectsCommand } from './commands/projects.js'
 import { ps } from './commands/ps.js'
 import { registerReject } from './commands/reject.js'
 import { registerRoutinesCommand } from './commands/routines.js'
@@ -76,5 +77,6 @@ registerDecisions(program, client())
 registerApprove(program, client())
 registerReject(program, client())
 registerSync(program, client())
+registerProjectsCommand(program, client())
 
 program.parseAsync(process.argv)
