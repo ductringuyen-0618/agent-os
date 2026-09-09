@@ -125,7 +125,12 @@ async function mirrorFile(
     ctx.log.append({
       type: 'raw.added',
       runId: ctx.runId,
-      payload: { project: ctx.project.name, file: destRelPath },
+      payload: {
+        project: ctx.project.name,
+        file: destRelPath,
+        // os-root-relative, posix form: what the ingest skill reads as payload.path
+        path: `raw/${ctx.project.name}/${destRelPath}`,
+      },
     })
   }
   return { oldContent, newContent: content }
@@ -140,16 +145,15 @@ export const techpulseCooAdapter: ProjectAdapter = {
 
     const proposalsDir = path.join(ctx.project.clone, opts.proposals_path)
     for (const file of await listMdFiles(proposalsDir)) {
-      const destRel = path.join('proposals', file)
-      const mirrored = await mirrorFile(
-        ctx,
-        path.join(proposalsDir, file),
-        destRel,
-        result,
-      )
-      if (!mirrored) continue
-      const newStatus = readStatus(mirrored.newContent)
-      const oldStatus = mirrored.oldContent
+      // posix form so refs/events are identical on every OS
+      const destRel = `proposals/${file}`
+      const srcPath = path.join(proposalsDir, file)
+      const mirrored = await mirrorFile(ctx, srcPath, destRel, result)
+      // An unchanged file may still lack its Decision (e.g. an earlier sync
+      // crashed after mirroring), so status is checked on every sync.
+      const content = mirrored?.newContent ?? (await readFile(srcPath, 'utf8'))
+      const newStatus = readStatus(content)
+      const oldStatus = mirrored?.oldContent
         ? readStatus(mirrored.oldContent)
         : undefined
       if (oldStatus && oldStatus !== newStatus) {
@@ -161,7 +165,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
         })
       }
       if (newStatus === 'proposed') {
-        await ensureDecision(ctx, destRel, mirrored.newContent)
+        await ensureDecision(ctx, destRel, content)
       }
     }
 
@@ -170,7 +174,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
       await mirrorFile(
         ctx,
         path.join(reportsDir, file),
-        path.join('reports', file),
+        `reports/${file}`,
         result,
       )
     }

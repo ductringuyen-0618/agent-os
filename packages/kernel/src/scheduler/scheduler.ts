@@ -102,11 +102,11 @@ export class Scheduler {
     }
   }
 
-  private trigger(lr: LoadedRoutine): void {
+  private trigger(lr: LoadedRoutine, payload?: Record<string, unknown>): void {
     if (!lr.enabled) return
     if (lr.config.after && !this.afterOk(lr.config.after)) return
     if (lr.everyMs === undefined) {
-      this.runRoutine(lr.config).catch(() => {})
+      this.runRoutine(lr.config, payload).catch(() => {})
       return
     }
     lr.inFlight = true
@@ -235,7 +235,9 @@ export class Scheduler {
   onEvent(e: Event): void {
     for (const lr of this.routines.values()) {
       if (!lr.enabled) continue
-      if (matchesOn(lr.config.on, e.type)) this.trigger(lr)
+      // The triggering event is the run's task payload (e.g. raw.added's path).
+      if (matchesOn(lr.config.on, e.type))
+        this.trigger(lr, { event: e.type, ...e.payload })
     }
   }
 

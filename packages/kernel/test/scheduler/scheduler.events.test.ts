@@ -39,6 +39,11 @@ describe('Scheduler.onEvent', () => {
     scheduler.start()
     log.append({ type: 'raw.added', payload: { path: 'raw/x.md' } })
     expect(exec).toHaveBeenCalledTimes(1)
+    // the triggering event becomes the run's task payload
+    expect(exec.mock.calls[0][1]).toEqual({
+      event: 'raw.added',
+      path: 'raw/x.md',
+    })
     log.append({ type: 'custom.foo', payload: {} })
     expect(exec).toHaveBeenCalledTimes(2)
     log.append({ type: 'raw.changed', payload: {} })

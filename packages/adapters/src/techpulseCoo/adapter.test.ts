@@ -1,4 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { AdapterContext } from '@agentos/kernel/adapters/types'
@@ -65,7 +71,7 @@ describe('techpulseCooAdapter.sync', () => {
 
     const result = await techpulseCooAdapter.sync(ctx)
 
-    expect(result.added).toContain(path.join('proposals', '001-dark-mode.md'))
+    expect(result.added).toContain('proposals/001-dark-mode.md')
     expect(result.added).toContain('state.md')
     expect(result.events).toContain('raw.added')
     const mirrored = readFileSync(
@@ -102,12 +108,34 @@ describe('techpulseCooAdapter.sync — decisions', () => {
     expect(decisions).toHaveLength(1)
     expect(decisions[0]).toMatchObject({
       adapter: 'techpulse-coo',
-      ref: path.join('proposals', '001-dark-mode.md'),
+      ref: 'proposals/001-dark-mode.md',
       status: 'pending',
       title: 'Add dark mode toggle',
     })
     expect(decisions[0].body).toContain('Why this increases engagement')
     expect(decisions[0].body).toContain('Effort estimate')
+  })
+
+  it('raises the decision for a proposal an earlier crashed sync had already mirrored', async () => {
+    const { cloneDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+    // Simulate a previous sync that mirrored the file but died before ensureDecision.
+    const rawDir = path.join(osRoot, 'raw', 'techpulse', 'proposals')
+    mkdirSync(rawDir, { recursive: true })
+    writeFileSync(
+      path.join(rawDir, '001-dark-mode.md'),
+      readFileSync(
+        path.join(cloneDir, 'docs/missions/coo/proposals/001-dark-mode.md'),
+        'utf8',
+      ),
+    )
+
+    const result = await techpulseCooAdapter.sync(ctx)
+
+    expect(result.added).not.toContain('proposals/001-dark-mode.md')
+    // biome-ignore lint/suspicious/noExplicitAny: fakeCtx's log stub exposes listDecisions beyond the AdapterContext type
+    expect((ctx.log as any).listDecisions()).toHaveLength(1)
   })
 
   it('does not duplicate a decision on a second sync', async () => {
