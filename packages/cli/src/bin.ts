@@ -7,6 +7,7 @@ import { runInit } from './commands/init.js'
 import { logs } from './commands/logs.js'
 import { ps } from './commands/ps.js'
 import { registerReject } from './commands/reject.js'
+import { requestFeature } from './commands/request.js'
 import { registerRoutinesCommand } from './commands/routines.js'
 import { run as runCommand } from './commands/run.js'
 import { registerSync } from './commands/sync.js'
@@ -67,6 +68,25 @@ program
       skill,
       agent: opts.agent,
       payload: opts.payload,
+    })
+  })
+
+program
+  .command('request <project> <title>')
+  .description('open a feature request: proposal, build, validate, review, PR')
+  .option('--description <text>', 'the feature description')
+  .option('--file <path>', 'read the description from a file')
+  .option(
+    '--no-auto-approve',
+    'require manual approval of the proposal before building',
+  )
+  .action(async (project: string, title: string, opts) => {
+    await requestFeature(client(), {
+      project,
+      title,
+      description: opts.description,
+      file: opts.file,
+      autoApprove: opts.autoApprove,
     })
   })
 
