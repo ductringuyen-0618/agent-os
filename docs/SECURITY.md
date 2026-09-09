@@ -61,10 +61,21 @@ nothing else.
 - Real secrets (a GitHub token, API keys) live only in `.env`
   (gitignored) or the environment the daemon was started in. GitHub
   operations reuse the local `gh` CLI login rather than a stored token.
-- `.gitleaks.toml` plus a `lefthook` pre-commit hook
-  (`gitleaks protect --staged`) catch anything that slips past `remember`
-  before it reaches a commit; CI runs the official gitleaks action as a
-  second check on every push.
+- `.gitleaks.toml` defines the ruleset that catches anything that slips
+  past `remember` before it reaches a commit; CI runs the official
+  gitleaks action as a check on every push.
+
+## Local secret scanning
+This repo does not ship an automated pre-commit hook. Before committing,
+run gitleaks yourself against your staged changes:
+
+```
+gitleaks protect --staged --config .gitleaks.toml
+```
+
+CI runs the same `.gitleaks.toml` ruleset via the official gitleaks
+action on every push, so anything missed locally is still caught before
+it can land on `main`.
 
 ## The approval boundary
 An adapter's `applyDecision` (e.g. flipping a TechPulse proposal's
