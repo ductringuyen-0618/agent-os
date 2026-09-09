@@ -1,7 +1,8 @@
-import type { PermissionMode, Run } from '@agentos/shared'
+import type { PermissionMode, Run, RunStatus } from '@agentos/shared'
 import { type ResultPromise, execa } from 'execa'
 import type { KernelConfig } from '../config.js'
 import type { EventLog } from '../log/eventLog.js'
+import { wrapUpPrompt } from './promptAssembler.js'
 import { parseStreamLine } from './streamParser.js'
 
 export interface SpawnSpec {
@@ -14,6 +15,18 @@ export interface SpawnSpec {
   addDirs: string[]
   mcpConfigPath: string
   resumeSessionId?: string
+  timeoutMs: number
+}
+
+export interface WrapUpSpec {
+  skill: string
+  osRoot: string
+  cwd: string
+  model: string
+  permissionMode: SpawnSpec['permissionMode']
+  allowedTools: string[]
+  addDirs: string[]
+  mcpConfigPath: string
   timeoutMs: number
 }
 
@@ -191,6 +204,64 @@ export class ProcessManager {
       resultText,
       error,
     }
+  }
+
+  async runToCompletion(
+    run: Run,
+    mainSpec: SpawnSpec,
+    wrapUp: WrapUpSpec,
+  ): Promise<RunResult> {
+    this.log.updateRun(run.id, { status: 'running' })
+    const mainResult = await this.start(run, mainSpec)
+
+    if (mainResult.status !== 'success') {
+      const status: RunStatus =
+        mainResult.status === 'killed' ? 'killed' : 'failed'
+      this.log.updateRun(run.id, {
+        status,
+        endedAt: new Date().toISOString(),
+        error: mainResult.error,
+      })
+      return mainResult
+    }
+
+    this.log.updateRun(run.id, {
+      status: 'wrapping_up',
+      sessionId: mainResult.sessionId,
+    })
+    const wrapUpSpec: SpawnSpec = {
+      prompt: wrapUpPrompt(wrapUp.osRoot, wrapUp.skill),
+      systemPromptAppend: mainSpec.systemPromptAppend,
+      cwd: wrapUp.cwd,
+      model: wrapUp.model,
+      permissionMode: wrapUp.permissionMode,
+      allowedTools: wrapUp.allowedTools,
+      addDirs: wrapUp.addDirs,
+      mcpConfigPath: wrapUp.mcpConfigPath,
+      resumeSessionId: mainResult.sessionId,
+      timeoutMs: wrapUp.timeoutMs,
+    }
+    const wrapResult = await this.start(run, wrapUpSpec)
+    this.log.append({
+      type: 'run.wrapup',
+      runId: run.id,
+      payload: { status: wrapResult.status },
+    })
+
+    const finalStatus: RunStatus =
+      wrapResult.status === 'success' ? 'success' : 'failed'
+    this.log.updateRun(run.id, {
+      status: finalStatus,
+      endedAt: new Date().toISOString(),
+      costUsd: (mainResult.costUsd ?? 0) + (wrapResult.costUsd ?? 0),
+      inputTokens:
+        (mainResult.inputTokens ?? 0) + (wrapResult.inputTokens ?? 0),
+      outputTokens:
+        (mainResult.outputTokens ?? 0) + (wrapResult.outputTokens ?? 0),
+      error: finalStatus === 'failed' ? wrapResult.error : undefined,
+    })
+
+    return { ...wrapResult, status: finalStatus }
   }
 
   kill(runId: string): boolean {
