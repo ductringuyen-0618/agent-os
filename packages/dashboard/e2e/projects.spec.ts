@@ -13,6 +13,6 @@ test('adds a project from a fake gh repo list and shows the no-COO-layout copy',
   await page.getByRole('button', { name: /add project/i }).click()
 
   await expect(page.getByRole('alertdialog')).not.toBeVisible()
-  await expect(page.getByText('widgets')).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'widgets' })).toBeVisible()
   await expect(page.getByText(/no proposals folder yet/i)).toBeVisible()
 })

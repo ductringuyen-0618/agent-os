@@ -48,7 +48,9 @@ test('requests panel shows a seeded workflow and its live stepper', async ({
   await page.goto('/')
   await page.getByRole('button', { name: 'Requests', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
-  await page.getByText('Add a personalized company digest').click()
+  await page
+    .getByRole('button', { name: 'Add a personalized company digest' })
+    .click()
   await expect(page.getByText('build').first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Terminate' })).toBeVisible()
