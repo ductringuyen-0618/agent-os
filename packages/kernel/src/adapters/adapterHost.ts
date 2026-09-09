@@ -30,9 +30,10 @@ export class AdapterHost {
       .replaceAll('${AGENTOS_HOME}', this.cfg.osRoot)
       .replaceAll('${AGENTOS_CLONES}', path.join(this.cfg.runtimeDir, 'clones'))
     // Variable expansion mixes native separators (from path.join above) with
-    // the '/' literals from the YAML source, e.g. 'C:\...\clones/techpulse'
-    // on Windows. Normalize once here, the single point where path-valued
-    // fields are produced, so every caller gets a platform-native path.
+    // the '/' literals from the YAML source (on Windows: a backslash-joined
+    // prefix followed by 'clones/techpulse'). Normalize once here, the single
+    // point where path-valued fields are produced, so every caller gets a
+    // platform-native path.
     return path.normalize(expanded)
   }
 
