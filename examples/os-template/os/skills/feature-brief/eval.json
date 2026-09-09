@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "key": "wrote_proposal",
+      "weight": 0.4,
+      "description": "Called remember exactly once, at payload.proposalPath, with all seven required sections present."
+    },
+    {
+      "key": "grounded_in_context",
+      "weight": 0.3,
+      "description": "get_context and relevant read_wiki calls were made before writing; no fabricated facts about the project."
+    },
+    {
+      "key": "checkable_validation_contract",
+      "weight": 0.3,
+      "description": "The Validation contract section names concrete, check-able criteria the build must satisfy."
+    }
+  ]
+}

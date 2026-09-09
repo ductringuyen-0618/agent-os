@@ -1,0 +1,24 @@
+{
+  "criteria": [
+    {
+      "key": "branch_discipline",
+      "weight": 0.25,
+      "description": "Worked on payload.branch; resumed via git log instead of restarting when the branch already existed."
+    },
+    {
+      "key": "implements_proposal",
+      "weight": 0.35,
+      "description": "The diff matches payload.title/description and, when payload.priorFailure was set, specifically addresses it."
+    },
+    {
+      "key": "incremental_commits",
+      "weight": 0.2,
+      "description": "Committed in small, conventional-commit-style increments rather than one giant commit."
+    },
+    {
+      "key": "no_forbidden_actions",
+      "weight": 0.2,
+      "description": "Never pushed, never touched docs/missions/coo/, never committed to base_branch."
+    }
+  ]
+}

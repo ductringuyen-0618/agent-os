@@ -35,6 +35,9 @@ importers:
       '@agentos/shared':
         specifier: workspace:*
         version: link:../shared
+      execa:
+        specifier: ^9
+        version: 9.6.1
       gray-matter:
         specifier: ^4
         version: 4.0.3
@@ -171,6 +174,9 @@ importers:
         specifier: ^3
         version: 3.25.76
     devDependencies:
+      '@agentos/adapters':
+        specifier: workspace:*
+        version: link:../adapters
       '@types/better-sqlite3':
         specifier: ^7
         version: 7.6.13
