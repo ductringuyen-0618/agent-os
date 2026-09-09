@@ -99,3 +99,29 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
     }),
   );
 }
+
+export class MockWebSocket {
+  static instances: MockWebSocket[] = [];
+  onopen: (() => void) | null = null;
+  onclose: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onmessage: ((ev: { data: string }) => void) | null = null;
+  readyState = 0;
+  url: string;
+  constructor(url: string) {
+    this.url = url;
+    MockWebSocket.instances.push(this);
+    setTimeout(() => {
+      this.readyState = 1;
+      this.onopen?.();
+    }, 0);
+  }
+  close() {
+    this.readyState = 3;
+    this.onclose?.();
+  }
+  send() {}
+  emit(data: unknown) {
+    this.onmessage?.({ data: JSON.stringify(data) });
+  }
+}
