@@ -15,6 +15,7 @@ import { EventLog } from './log/eventLog.js'
 import { writeRunMcpConfig } from './process/mcpConfig.js'
 import { ProcessManager } from './process/processManager.js'
 import { assemblePrompt } from './process/promptAssembler.js'
+import { ProjectService } from './projects/projectService.js'
 import { Scheduler } from './scheduler/scheduler.js'
 import { WikiService } from './wiki/wikiService.js'
 
@@ -25,6 +26,7 @@ export interface Kernel {
   scheduler: Scheduler
   wiki: WikiService
   adapters: AdapterHost
+  projects: ProjectService
   start(): Promise<void>
   stop(): Promise<void>
 }
@@ -40,6 +42,7 @@ class KernelImpl implements Kernel {
   scheduler: Scheduler
   wiki: WikiService
   adapters: AdapterHost
+  projects: ProjectService
   private server: FastifyInstance | undefined
   private routinesFile: RoutinesFile | undefined
 
@@ -53,6 +56,12 @@ class KernelImpl implements Kernel {
     this.adapters = new AdapterHost(cfg, this.log, this.wiki, registry)
     this.scheduler = new Scheduler(cfg, this.log, (routine, payload) =>
       this.exec(routine, payload),
+    )
+    this.projects = new ProjectService(
+      cfg,
+      this.adapters,
+      this.scheduler,
+      this.log,
     )
   }
 
