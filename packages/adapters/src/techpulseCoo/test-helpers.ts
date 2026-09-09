@@ -36,9 +36,15 @@ export async function createTempTechpulseRepo() {
   const proposalsDir = path.join(seedDir, 'docs/missions/coo/proposals')
   mkdirSync(proposalsDir, { recursive: true })
   writeFileSync(path.join(proposalsDir, '001-dark-mode.md'), PROPOSAL_1)
-  mkdirSync(path.join(seedDir, 'docs/missions/coo/reports'), {
-    recursive: true,
-  })
+  // .gitkeep in both dirs so the "layout already exists" fixture actually
+  // survives a git round-trip: git doesn't track empty directories, so
+  // without a tracked file inside it, docs/missions/coo/reports/ would
+  // silently vanish from the clone and bootstrapCooLayout would (correctly)
+  // report it as missing.
+  writeFileSync(path.join(proposalsDir, '.gitkeep'), '')
+  const reportsDir = path.join(seedDir, 'docs/missions/coo/reports')
+  mkdirSync(reportsDir, { recursive: true })
+  writeFileSync(path.join(reportsDir, '.gitkeep'), '')
   writeFileSync(
     path.join(seedDir, 'docs/missions/coo/state.md'),
     '# COO state\n\nAll quiet.\n',

@@ -18,8 +18,77 @@ export interface SyncResult {
   hasCooLayout?: boolean
 }
 
+export interface FeatureRequestPushProposalInput {
+  slug: string
+  title: string
+  proposalBody: string
+  status: 'approved' | 'proposed'
+}
+
+export interface FeatureRequestPushProposalResult {
+  file: string
+  sha: string
+  bootstrapped: boolean
+}
+
+export interface FeatureRequestOpenPrInput {
+  branch: string
+  slug: string
+  title: string
+  proposalFile: string
+  proposalWhatWhy: string
+  validationOutput: string
+  reviewOutput: string
+}
+
+export interface FeatureRequestOpenPrResult {
+  url: string
+  number: number
+}
+
+export interface FeatureRequestWriteReportInput {
+  slug: string
+  branch: string
+  prUrl: string
+  validationOutput: string
+  reviewOutput: string
+}
+
+export interface FeatureRequestWriteReportResult {
+  file: string
+  sha: string
+}
+
+/**
+ * Adapter-specific operations the `feature-request` workflow (spec §5)
+ * needs beyond sync/applyDecision. Optional on ProjectAdapter -- only
+ * adapters that manage a proposals layout (currently just techpulse-coo)
+ * implement it; the workflow refuses a project whose adapter doesn't.
+ */
+export interface FeatureRequestAdapterOps {
+  bootstrapLayout(ctx: AdapterContext): Promise<{ created: string[] }>
+  pushProposal(
+    ctx: AdapterContext,
+    input: FeatureRequestPushProposalInput,
+  ): Promise<FeatureRequestPushProposalResult>
+  openPullRequest(
+    ctx: AdapterContext,
+    input: FeatureRequestOpenPrInput,
+  ): Promise<FeatureRequestOpenPrResult>
+  markShipped(
+    ctx: AdapterContext,
+    slug: string,
+    proposalFile: string,
+  ): Promise<{ sha: string }>
+  writeReport(
+    ctx: AdapterContext,
+    input: FeatureRequestWriteReportInput,
+  ): Promise<FeatureRequestWriteReportResult>
+}
+
 export interface ProjectAdapter {
   name: string
   sync(ctx: AdapterContext): Promise<SyncResult>
   applyDecision(decision: Decision, ctx: AdapterContext): Promise<void>
+  featureRequests?: FeatureRequestAdapterOps
 }

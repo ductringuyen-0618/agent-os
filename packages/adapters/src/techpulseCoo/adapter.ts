@@ -26,7 +26,7 @@ async function pathExists(p: string): Promise<boolean> {
     .catch(() => false)
 }
 
-async function ensureClone(ctx: AdapterContext): Promise<void> {
+export async function ensureClone(ctx: AdapterContext): Promise<void> {
   const { project } = ctx
   if (await pathExists(path.join(project.clone, '.git'))) {
     const repoGit = simpleGit(project.clone)
