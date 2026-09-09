@@ -1077,7 +1077,7 @@ describe('openPullRequest', () => {
         title: 'Leaky',
         proposalFile: 'docs/missions/coo/proposals/001-dark-mode.md',
         proposalWhatWhy: 'fine',
-        validationOutput: `key = AKIAABCDEFGHIJKLMNOP`,
+        validationOutput: `key = AKIA<sixteen-fake-chars>`,
         reviewOutput: 'PASS',
       }),
     ).rejects.toThrow(/Secret/)
