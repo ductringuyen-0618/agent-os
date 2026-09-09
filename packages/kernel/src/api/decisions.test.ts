@@ -102,6 +102,21 @@ describe('decisions + projects routes', () => {
     expect(res.statusCode).toBe(409)
   })
 
+  it('lets an errored decision be approved again', async () => {
+    // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for Kernel
+    const kernel: any = makeKernel()
+    const decision = kernel.log.createDecision({ title: 't', body: 'b' })
+    kernel.log.resolveDecision(decision.id, 'error', 'ENOENT')
+    const app = buildServer(kernel)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/decisions/${decision.id}/approve`,
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('approved')
+  })
+
   it('exposes POST /api/projects/:name/sync', async () => {
     // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for Kernel
     const kernel: any = makeKernel()
