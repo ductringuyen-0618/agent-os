@@ -8,6 +8,7 @@ import { loadKernelConfig } from '../config.js'
 import type { Kernel } from '../kernel.js'
 import { EventLog } from '../log/eventLog.js'
 import { ProcessManager } from '../process/processManager.js'
+import { WikiService } from '../wiki/wikiService.js'
 import { buildServer } from './server.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -144,6 +145,57 @@ describe('api/server runs routes', () => {
       headers: { authorization: 'Bearer secret' },
     })
     expect(authorized.statusCode).toBe(200)
+    await app.close()
+  })
+
+  it('reaches /internal/syscall via X-Run-Token even when a daemon authToken is set', async () => {
+    await fsp.mkdir(path.join(osRoot, 'wiki'), { recursive: true })
+    const cfg = loadKernelConfig(osRoot, {
+      claudeBin: fakeClaudeBin,
+      runtimeDir: path.join(tmpDir, '.agentos'),
+      dbPath: path.join(tmpDir, '.agentos', 'agentos.db'),
+      authToken: 'secret',
+    })
+    const pm = new ProcessManager(cfg, log)
+    const wiki = new WikiService(osRoot, log)
+    const scheduler = {
+      scheduleOnce: () => 'sched-1',
+    } as unknown as Kernel['scheduler']
+    const app = buildServer({
+      cfg,
+      log,
+      pm,
+      wiki,
+      scheduler,
+    } as unknown as Kernel)
+
+    const run = log.createRun({
+      routine: 'ingest',
+      skill: 'ingest',
+      agent: 'librarian',
+    })
+    log.createRunToken(run.id, 'tok-good')
+
+    // No Authorization header at all — only the run token, as a sandboxed
+    // agent subprocess would send it. Must NOT be blocked by the daemon's
+    // admin bearer-token hook.
+    const res = await app.inject({
+      method: 'POST',
+      url: '/internal/syscall',
+      headers: { 'x-run-token': 'tok-good' },
+      payload: { tool: 'get_context', args: {} },
+    })
+    expect(res.statusCode).toBe(200)
+
+    // A missing/invalid run token must still 401 (via internal.ts's own
+    // check, not the bearer hook) even without an Authorization header.
+    const noToken = await app.inject({
+      method: 'POST',
+      url: '/internal/syscall',
+      payload: { tool: 'get_context', args: {} },
+    })
+    expect(noToken.statusCode).toBe(401)
+
     await app.close()
   })
 })

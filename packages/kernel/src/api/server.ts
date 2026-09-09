@@ -70,6 +70,14 @@ export function buildServer(kernel: Kernel): FastifyInstance {
   app.addHook('onRequest', async (req, reply) => {
     if (!cfg.authToken) return
     if (req.url === '/api/health') return
+    // /internal/syscall authenticates with its own X-Run-Token (per-run,
+    // handed only to the sandboxed agent subprocess) rather than the
+    // daemon's admin bearer token — by design, since distributing the
+    // admin secret into every run's syscall MCP config would defeat the
+    // point of per-run tokens. Without this exemption, the bearer check
+    // below 401s every syscall in any deployment with authToken set,
+    // before internal.ts's own token check ever runs.
+    if (req.url === '/internal/syscall') return
     const header = req.headers.authorization
     if (header !== `Bearer ${cfg.authToken}`) {
       reply.code(401).send({ error: 'unauthorized' } satisfies ErrorResponse)
