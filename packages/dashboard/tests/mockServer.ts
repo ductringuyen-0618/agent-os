@@ -138,6 +138,7 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
           status: 404,
         })
       const body = handler(url, init)
+      if (body instanceof Response) return body
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'content-type': 'application/json' },
