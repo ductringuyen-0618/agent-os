@@ -85,7 +85,11 @@ node packages/cli/dist/bin.js up --root ./my-os/os
   `context/handoff.md`, all rewritten by a kernel-driven wrap-up turn
   after every run.
 - **Routines** (`routines.yaml`) — the schedule: `every`/`cron`/`on`
-  triggers, `after:` chains a handoff from one skill's run into the next.
+  triggers, `after:` chains a handoff from one skill's run into the next,
+  `daily_budget_usd` (global or per routine) trips a circuit breaker that
+  skips further fires and alerts once a routine's spend for the UTC day
+  meets its cap — visible as a "budget hit" chip in the dashboard's
+  Routines and Costs panels, resetting on its own at midnight.
 - **Wiki** (`wiki/`) — LLM-owned memory; the *only* writer is the
   `remember` syscall, which keeps `index.md` and `log.md` in sync.
 - **Decisions** — created by `request_approval`, resolved only by a human

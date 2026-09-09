@@ -28,6 +28,11 @@ interface LoadedRoutine {
   inFlight?: boolean
 }
 
+/** UTC calendar day string ('YYYY-MM-DD') used to dedupe budget alerts per day. */
+function utcDateKey(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
 const TICK_MS = 15_000
 const MIN_GRACE_MS = 60_000
 
@@ -43,6 +48,10 @@ export class Scheduler {
   private tickHandle?: NodeJS.Timeout
   private unsubscribe?: () => void
   private started = false
+  // Last UTC day a budget_exceeded alert fired for a given routine, so a
+  // tight `every:` interval trips the alert once per day rather than once
+  // per skipped fire.
+  private budgetAlertDates = new Map<string, string>()
 
   constructor(
     private cfg: KernelConfig,
@@ -116,6 +125,7 @@ export class Scheduler {
   }
 
   private async runTrackedEveryRoutine(lr: LoadedRoutine): Promise<void> {
+    if (this.budgetTripped(lr.config)) return
     const run = this.log.createRun({
       routine: lr.config.name,
       skill: lr.config.skill,
@@ -159,6 +169,9 @@ export class Scheduler {
     config: RoutineConfig,
     payload?: Record<string, unknown>,
   ): Promise<string> {
+    if (this.budgetTripped(config)) {
+      throw new Error(`daily budget exceeded for routine "${config.name}"`)
+    }
     const run = this.log.createRun({
       routine: config.name,
       skill: config.skill,
@@ -194,6 +207,36 @@ export class Scheduler {
     return config.max_attempts ?? this.defaults.max_attempts
   }
 
+  private effectiveDailyBudget(config: RoutineConfig): number | undefined {
+    return config.daily_budget_usd ?? this.defaults.daily_budget_usd
+  }
+
+  /**
+   * Checks whether the routine has already spent its daily cap. If so,
+   * emits one deduped `ops.alert` per routine per UTC day and returns
+   * true so the caller skips spawning a run.
+   */
+  private budgetTripped(config: RoutineConfig): boolean {
+    const capUsd = this.effectiveDailyBudget(config)
+    if (capUsd === undefined) return false
+    const spentUsd = this.log.costForRoutineToday(config.name)
+    if (spentUsd < capUsd) return false
+    const today = utcDateKey()
+    if (this.budgetAlertDates.get(config.name) !== today) {
+      this.budgetAlertDates.set(config.name, today)
+      this.log.append({
+        type: 'ops.alert',
+        payload: {
+          routine: config.name,
+          reason: 'budget_exceeded',
+          capUsd,
+          spentUsd,
+        },
+      })
+    }
+    return true
+  }
+
   private async handleFailure(
     run: Run,
     config: RoutineConfig,
@@ -209,6 +252,7 @@ export class Scheduler {
     if (run.attempt < maxAttempts) {
       const backoffMs = 30_000 * run.attempt
       setTimeout(() => {
+        if (this.budgetTripped(config)) return
         const retryRun = this.log.createRun({
           routine: config.name,
           skill: config.skill,
@@ -332,11 +376,28 @@ export class Scheduler {
     return undefined
   }
 
-  list(): Array<{ routine: RoutineConfig; nextRun?: string; lastRun?: Run }> {
-    return Array.from(this.routines.values()).map((lr) => ({
-      routine: { ...lr.config, enabled: lr.enabled },
-      nextRun: this.computeNextRun(lr),
-      lastRun: this.log.listRuns({ routine: lr.config.name, limit: 1 })[0],
-    }))
+  list(): Array<{
+    routine: RoutineConfig
+    nextRun?: string
+    lastRun?: Run
+    dailyBudgetUsd?: number
+    spentTodayUsd?: number
+    budgetTripped?: boolean
+  }> {
+    return Array.from(this.routines.values()).map((lr) => {
+      const dailyBudgetUsd = this.effectiveDailyBudget(lr.config)
+      return {
+        routine: { ...lr.config, enabled: lr.enabled },
+        nextRun: this.computeNextRun(lr),
+        lastRun: this.log.listRuns({ routine: lr.config.name, limit: 1 })[0],
+        dailyBudgetUsd,
+        spentTodayUsd:
+          dailyBudgetUsd === undefined
+            ? undefined
+            : this.log.costForRoutineToday(lr.config.name),
+        budgetTripped:
+          this.budgetAlertDates.get(lr.config.name) === utcDateKey(),
+      }
+    })
   }
 }

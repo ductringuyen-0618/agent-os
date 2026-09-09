@@ -6,7 +6,7 @@ import { Icon } from '../components/Icon'
 import { SkeletonRows } from '../components/Skeleton'
 import { StatusBadge } from '../components/StatusBadge'
 import { useToast } from '../components/Toast'
-import { relativeTime } from '../lib/time'
+import { relativeTime, usd } from '../lib/time'
 
 const client = new ApiClient()
 
@@ -87,7 +87,15 @@ export function RoutinesPanel() {
             </tr>
           </thead>
           <tbody>
-            {items.map(({ routine, nextRun, lastRun }) => {
+            {items.map((item) => {
+              const {
+                routine,
+                nextRun,
+                lastRun,
+                dailyBudgetUsd,
+                spentTodayUsd,
+                budgetTripped,
+              } = item
               const paused = routine.enabled === false
               return (
                 <tr
@@ -97,6 +105,14 @@ export function RoutinesPanel() {
                   <td className="py-2.5 font-mono text-text">
                     {routine.name}
                     {paused && <span className="chip ml-2">paused</span>}
+                    {budgetTripped && (
+                      <span className="chip ml-2">budget hit</span>
+                    )}
+                    {dailyBudgetUsd !== undefined && (
+                      <span className="ml-2 text-xs text-muted">
+                        {usd(spentTodayUsd)} / {usd(dailyBudgetUsd)}
+                      </span>
+                    )}
                   </td>
                   <td className="text-muted">{describeTrigger(routine)}</td>
                   <td className="text-muted">

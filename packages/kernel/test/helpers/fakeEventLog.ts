@@ -73,6 +73,18 @@ export class FakeEventLog {
     const s = this.schedules.find((x) => x.id === id)
     if (s) s.firedAt = firedAtIso
   }
+  costForRoutineToday(routine: string): number {
+    const todayPrefix = new Date().toISOString().slice(0, 10)
+    return this.runs
+      .filter(
+        (r) =>
+          r.routine === routine &&
+          r.costUsd !== undefined &&
+          r.startedAt !== undefined &&
+          r.startedAt.slice(0, 10) === todayPrefix,
+      )
+      .reduce((sum, r) => sum + (r.costUsd ?? 0), 0)
+  }
 }
 
 export const DEFAULTS = {
