@@ -89,6 +89,42 @@ describe('ProcessManager.runToCompletion', () => {
     expect(wrapupEvents).toHaveLength(1)
   })
 
+  it('keeps the main turn result text even after the wrap-up turn', async () => {
+    process.env.FAKE_CLAUDE_FIXTURE = fixtures('init-success.jsonl')
+    process.env.FAKE_CLAUDE_WRAPUP_FIXTURE = fixtures('wrapup-success.jsonl')
+    const run = log.createRun({
+      routine: 'ingest',
+      skill: 'ingest',
+      agent: 'librarian',
+    })
+    const mcpConfigPath = path.join(dir, 'mcp.json')
+    await fs.writeFile(mcpConfigPath, '{}', 'utf8')
+    const result = await pm.runToCompletion(run, baseSpec(mcpConfigPath), {
+      skill: 'ingest',
+      osRoot: dir,
+      ...baseSpec(mcpConfigPath),
+    })
+    expect(result.resultText).toBe('Heartbeat check complete.')
+  })
+
+  it('runs only the main turn when no wrap-up is given (workflow steps)', async () => {
+    process.env.FAKE_CLAUDE_FIXTURE = fixtures('init-success.jsonl')
+    const run = log.createRun({
+      routine: 'workflow:feature-request:build',
+      skill: 'feature-build',
+      agent: 'ops',
+    })
+    const mcpConfigPath = path.join(dir, 'mcp.json')
+    await fs.writeFile(mcpConfigPath, '{}', 'utf8')
+    const result = await pm.runToCompletion(run, baseSpec(mcpConfigPath))
+    expect(result.status).toBe('success')
+    expect(result.resultText).toBe('Heartbeat check complete.')
+    expect(log.getRun(run.id)?.status).toBe('success')
+    expect(
+      log.listEvents({ runId: run.id, types: ['run.wrapup'] }),
+    ).toHaveLength(0)
+  })
+
   it('does not run the wrap-up turn when the main run fails', async () => {
     process.env.FAKE_CLAUDE_FIXTURE = fixtures('error.jsonl')
     const run = log.createRun({

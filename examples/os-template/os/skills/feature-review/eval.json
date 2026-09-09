@@ -1,0 +1,24 @@
+{
+  "criteria": [
+    {
+      "key": "read_the_diff",
+      "weight": 0.25,
+      "description": "Actually read the changed files, not just their names."
+    },
+    {
+      "key": "judged_against_proposal",
+      "weight": 0.35,
+      "description": "PASS/FAIL reasoning is grounded in payload.proposalMarkdown's Proposed solution and Validation contract, not generic code review."
+    },
+    {
+      "key": "actionable_fail_reasons",
+      "weight": 0.25,
+      "description": "A FAIL includes specific, file-level, actionable feedback usable as the next build-fix's input."
+    },
+    {
+      "key": "correct_pass_fail_line",
+      "weight": 0.15,
+      "description": "Final message's first line is exactly PASS or FAIL."
+    }
+  ]
+}

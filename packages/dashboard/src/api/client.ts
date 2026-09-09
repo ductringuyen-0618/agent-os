@@ -1,13 +1,22 @@
 import type {
+  AddProjectResponse,
+  CreateWorkflowRequest,
+  CreateWorkflowResponse,
   Decision,
   DecisionStatus,
+  DeliverWorkflowEventRequest,
   EvalCriteria,
   Event,
+  GetWorkflowResponse,
+  GithubRepo,
+  ListWorkflowsQuery,
   Message,
+  ProjectListItem,
   RoutineConfig,
   Run,
   RunStatus,
   SkillMeta,
+  WorkflowInstance,
 } from '@agentos/shared'
 
 export class ApiError extends Error {
@@ -165,6 +174,63 @@ export class ApiClient {
     return this.req<Message[]>(
       'GET',
       `/api/messages${limit ? `?limit=${limit}` : ''}`,
+    )
+  }
+
+  listGithubRepos(query?: string) {
+    return this.req<GithubRepo[]>(
+      'GET',
+      `/api/github/repos${query ? `?query=${encodeURIComponent(query)}` : ''}`,
+    )
+  }
+  listProjects() {
+    return this.req<ProjectListItem[]>('GET', '/api/projects')
+  }
+  addProject(input: {
+    repo: string
+    name?: string
+    adapter?: string
+    base_branch?: string
+    build?: boolean
+  }) {
+    return this.req<AddProjectResponse>('POST', '/api/projects', input)
+  }
+  removeProject(name: string) {
+    return this.req<{ ok: true }>('DELETE', `/api/projects/${name}`)
+  }
+  syncProject(name: string) {
+    return this.req<{ added: string[]; changed: string[]; events: string[] }>(
+      'POST',
+      `/api/projects/${name}/sync`,
+    )
+  }
+  listWorkflows(opts: ListWorkflowsQuery = {}) {
+    const qs = new URLSearchParams(opts as Record<string, string>).toString()
+    return this.req<WorkflowInstance[]>(
+      'GET',
+      `/api/workflows${qs ? `?${qs}` : ''}`,
+    )
+  }
+  getWorkflow(id: string) {
+    return this.req<GetWorkflowResponse>('GET', `/api/workflows/${id}`)
+  }
+  createWorkflow(body: CreateWorkflowRequest) {
+    return this.req<CreateWorkflowResponse>('POST', '/api/workflows', body)
+  }
+  pauseWorkflow(id: string) {
+    return this.req<WorkflowInstance>('POST', `/api/workflows/${id}/pause`)
+  }
+  resumeWorkflow(id: string) {
+    return this.req<WorkflowInstance>('POST', `/api/workflows/${id}/resume`)
+  }
+  terminateWorkflow(id: string) {
+    return this.req<WorkflowInstance>('POST', `/api/workflows/${id}/terminate`)
+  }
+  sendWorkflowEvent(id: string, event: DeliverWorkflowEventRequest) {
+    return this.req<{ id: number }>(
+      'POST',
+      `/api/workflows/${id}/events`,
+      event,
     )
   }
 }

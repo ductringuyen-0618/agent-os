@@ -1,7 +1,14 @@
 defaults:
   model: sonnet
-  permission_mode: plan
-  allowed_tools: [Read, Glob, Grep, WebFetch, WebSearch]
+  # `default` with a narrow allowed_tools list is the read-only mode. `plan`
+  # would refuse the mcp__agentos__* syscalls every skill depends on.
+  permission_mode: default
+  allowed_tools:
+    - Read
+    - Glob
+    - Grep
+    - WebFetch
+    - WebSearch
   max_attempts: 2
   timeout_ms: 600000
   # daily_budget_usd: 2.0 -- global cap; a routine can override its own below.
@@ -11,34 +18,53 @@ defaults:
 
 routines:
   - name: heartbeat
-    every: 30m
     skill: heartbeat
     agent: ops
+    every: 30m
     model: haiku
-    allowed_tools: [mcp__agentos__emit_event, mcp__agentos__remember, mcp__agentos__schedule, mcp__agentos__read_wiki]
+    allowed_tools:
+      - mcp__agentos__emit_event
+      - mcp__agentos__remember
+      - mcp__agentos__schedule
+      - mcp__agentos__read_wiki
     # daily_budget_usd: 1.0 -- overrides the global default for this routine.
   - name: techpulse-sync
-    every: 1h
-    # AdapterHost.sync(projectName) matches by the *project's* `name` field
-    # (os/projects/techpulse.yaml has name: techpulse, adapter:
-    # techpulse-coo) -- this must be the project name, not the adapter type,
-    # or every fire fails with "unknown project 'techpulse-coo'".
     adapter: techpulse
+    every: 1h
   - name: ingest
-    on: [raw.added]
     skill: ingest
     agent: librarian
+    on:
+      - raw.added
     permission_mode: acceptEdits
-    allowed_tools: [Read, mcp__agentos__remember, mcp__agentos__read_wiki, mcp__agentos__get_context]
+    allowed_tools:
+      - Read
+      - mcp__agentos__remember
+      - mcp__agentos__read_wiki
+      - mcp__agentos__get_context
   - name: lint
-    cron: "0 3 * * *"
     skill: lint
     agent: librarian
-    allowed_tools: [Read, Glob, Grep, mcp__agentos__remember, mcp__agentos__read_wiki]
+    cron: 0 3 * * *
+    allowed_tools:
+      - Read
+      - Glob
+      - Grep
+      - mcp__agentos__remember
+      - mcp__agentos__read_wiki
   - name: daily-digest
-    cron: "0 8 * * *"
     skill: daily-digest
     agent: ops
-    after: [lint]
+    cron: 0 8 * * *
+    after:
+      - lint
     permission_mode: acceptEdits
-    allowed_tools: [Read, Write, Glob, Grep, mcp__agentos__remember, mcp__agentos__read_wiki]
+    allowed_tools:
+      - Read
+      - Write
+      - Glob
+      - Grep
+      - mcp__agentos__remember
+      - mcp__agentos__read_wiki
+workflows:
+  max_concurrent: 2

@@ -28,7 +28,10 @@ export const EventTypeSchema = z.union([
   z.enum(BUILTIN_EVENT_TYPES),
   z
     .string()
-    .regex(/^custom\..+$/, 'custom event types must start with "custom."'),
+    .regex(
+      /^(custom|workflow)\..+$/,
+      'custom/workflow event types must start with "custom." or "workflow."',
+    ),
 ])
 
 export const RunStatusSchema = z.enum([
@@ -143,9 +146,75 @@ export const RoutineConfigSchema = z
     { message: 'at most one of every|cron|on may be set on a routine' },
   )
 
+export const WorkflowStatusSchema = z.enum([
+  'queued',
+  'running',
+  'waiting',
+  'sleeping',
+  'paused',
+  'succeeded',
+  'failed',
+  'terminated',
+])
+
+export const WorkflowSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  status: WorkflowStatusSchema,
+  project: z.string().optional(),
+  title: z.string(),
+  input: z.record(z.unknown()),
+  state: z.record(z.unknown()),
+  currentStep: z.string().optional(),
+  wakeAt: z.string().optional(),
+  waitEvent: z.string().optional(),
+  error: z.string().optional(),
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  endedAt: z.string().optional(),
+  updatedAt: z.string(),
+})
+
+export const WorkflowStepStatusSchema = z.enum([
+  'running',
+  'succeeded',
+  'failed',
+  'skipped',
+  'waiting',
+  'sleeping',
+])
+
+export const WorkflowStepSchema = z.object({
+  id: z.string(),
+  workflowId: z.string(),
+  name: z.string(),
+  seq: z.number().int(),
+  status: WorkflowStepStatusSchema,
+  attempt: z.number().int(),
+  runId: z.string().optional(),
+  output: z.unknown().optional(),
+  error: z.string().optional(),
+  startedAt: z.string(),
+  endedAt: z.string().optional(),
+})
+
+export const WorkflowsConfigSchema = z.object({
+  max_concurrent: z.number().int().positive(),
+})
+
 export const RoutinesFileSchema = z.object({
   defaults: RoutineDefaultsSchema,
   routines: z.array(RoutineConfigSchema),
+  workflows: WorkflowsConfigSchema.optional(),
+})
+
+export const ProjectBuildConfigSchema = z.object({
+  enabled: z.boolean(),
+  model: z.string(),
+  permission_mode: PermissionModeSchema,
+  allowed_tools: z.array(z.string()),
+  checks: z.array(z.string()),
+  timeout_ms: z.number().int(),
 })
 
 export const ProjectConfigSchema = z.object({
@@ -155,6 +224,7 @@ export const ProjectConfigSchema = z.object({
   clone: z.string(),
   base_branch: z.string(),
   options: z.record(z.unknown()),
+  build: ProjectBuildConfigSchema.optional(),
 })
 
 export const EvalCriteriaSchema = z.object({

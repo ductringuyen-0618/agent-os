@@ -54,3 +54,45 @@ describe('agents/librarian/AGENT.md', () => {
     expect(md.toLowerCase()).toContain('never')
   })
 })
+
+describe('feature-request skills', () => {
+  for (const skill of [
+    'feature-brief',
+    'feature-build',
+    'feature-validate',
+    'feature-review',
+  ]) {
+    it(`${skill} has skill.md, learnings.md, eval.json, context/handoff.md`, async () => {
+      const skillMd = await read(`skills/${skill}/skill.md`)
+      expect(skillMd).toContain('feature-request')
+      const evalJson = JSON.parse(await read(`skills/${skill}/eval.json`))
+      expect(Array.isArray(evalJson.criteria)).toBe(true)
+      expect(evalJson.criteria.length).toBeGreaterThan(0)
+      await expect(read(`skills/${skill}/learnings.md`)).resolves.toBeTruthy()
+      await expect(
+        read(`skills/${skill}/context/handoff.md`),
+      ).resolves.toBeTruthy()
+    })
+  }
+
+  it('feature-brief documents the required proposal sections', async () => {
+    const md = await read('skills/feature-brief/skill.md')
+    for (const heading of [
+      'What you get',
+      'Why start this now',
+      'Problem',
+      'Proposed solution',
+      'Effort estimate',
+      'Validation contract',
+      'Risks',
+    ]) {
+      expect(md).toContain(heading)
+    }
+  })
+
+  it('feature-build documents branch discipline and the never-push rule', async () => {
+    const md = await read('skills/feature-build/skill.md')
+    expect(md).toContain('req/')
+    expect(md.toLowerCase()).toContain('never push')
+  })
+})

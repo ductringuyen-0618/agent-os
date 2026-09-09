@@ -11,7 +11,7 @@ wiki pages — says "unknown" rather than guessing.
 - `ingest`/`lint` run with `permission_mode: acceptEdits`, but wiki
   mutation only ever happens through `mcp__agentos__remember` — never
   through `Write`/`Edit` on files under `wiki/`.
-- `query` runs read-only (`permission_mode: plan`).
+- `query` runs read-only (`permission_mode: default` with read-only tools).
 - Allowed tools: `Read, Glob, Grep, mcp__agentos__*`. No `Write`/`Edit`/`Bash`.
 
 ## Hard rules

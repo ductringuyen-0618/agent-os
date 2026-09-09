@@ -1,0 +1,5 @@
+# Fingerprints gitleaks may skip: a fake AWS key used as a test fixture in a
+# plan document (commit 6dd5053). The file no longer contains the literal;
+# the historical commit still does.
+6dd5053febb8a1d0adfb2c6d85cc64f65de5e7fe:docs/superpowers/plans/2026-09-09-feature-requests-w3-request-workflow.md:aws-access-token:976
+6dd5053febb8a1d0adfb2c6d85cc64f65de5e7fe:docs/superpowers/plans/2026-09-09-feature-requests-w3-request-workflow.md:aws-access-key:976

@@ -8,6 +8,8 @@ import {
   RoutineConfigSchema,
   RoutinesFileSchema,
   RunSchema,
+  WorkflowSchema,
+  WorkflowStepSchema,
   parseRoutinesFile,
 } from './schemas.js'
 
@@ -158,5 +160,102 @@ routines:
 describe('RoutinesFileSchema', () => {
   it('is used by parseRoutinesFile and is independently importable', () => {
     expect(RoutinesFileSchema).toBeDefined()
+  })
+})
+
+describe('EventTypeSchema workflow.* events', () => {
+  it('accepts a workflow.* event type', () => {
+    expect(() =>
+      EventSchema.parse({
+        id: 1,
+        ts: new Date().toISOString(),
+        type: 'workflow.step.started',
+        payload: {},
+      }),
+    ).not.toThrow()
+  })
+})
+
+describe('WorkflowSchema', () => {
+  const base = {
+    id: 'wf1',
+    kind: 'feature-request',
+    title: 'Add dark mode',
+    input: {},
+    state: {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+  it('accepts a minimal queued workflow instance', () => {
+    expect(() =>
+      WorkflowSchema.parse({ ...base, status: 'queued' }),
+    ).not.toThrow()
+  })
+  it('rejects an unknown status', () => {
+    expect(() => WorkflowSchema.parse({ ...base, status: 'nope' })).toThrow()
+  })
+})
+
+describe('WorkflowStepSchema', () => {
+  it('accepts a minimal succeeded step', () => {
+    expect(() =>
+      WorkflowStepSchema.parse({
+        id: 's1',
+        workflowId: 'wf1',
+        name: 'brief',
+        seq: 1,
+        status: 'succeeded',
+        attempt: 1,
+        startedAt: new Date().toISOString(),
+      }),
+    ).not.toThrow()
+  })
+})
+
+describe('RoutinesFileSchema workflows block', () => {
+  const yaml = (extra: string) =>
+    `defaults:\n  model: sonnet\n  permission_mode: plan\n  allowed_tools: []\n  max_attempts: 2\n  timeout_ms: 1000\nroutines: []\n${extra}`
+
+  it('accepts an optional workflows.max_concurrent', () => {
+    const file = parseRoutinesFile(yaml('workflows:\n  max_concurrent: 3\n'))
+    expect(file.workflows?.max_concurrent).toBe(3)
+  })
+  it('is optional -- an absent workflows block parses fine', () => {
+    const file = parseRoutinesFile(yaml(''))
+    expect(file.workflows).toBeUndefined()
+  })
+})
+
+describe('ProjectConfigSchema build block', () => {
+  it('accepts a project with a build block', () => {
+    const parsed = ProjectConfigSchema.parse({
+      name: 'demo',
+      adapter: 'techpulse-coo',
+      repo: 'o/r',
+      clone: '${AGENTOS_CLONES}/demo',
+      base_branch: 'main',
+      options: {},
+      build: {
+        enabled: true,
+        model: 'sonnet',
+        permission_mode: 'acceptEdits',
+        allowed_tools: ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'],
+        checks: ['pnpm -r --if-present typecheck'],
+        timeout_ms: 2_400_000,
+      },
+    })
+    expect(parsed.build?.checks).toEqual(['pnpm -r --if-present typecheck'])
+  })
+
+  it('accepts a project with no build block (build stays undefined)', () => {
+    const parsed = ProjectConfigSchema.parse({
+      name: 'demo',
+      adapter: 'techpulse-coo',
+      repo: 'o/r',
+      clone: '${AGENTOS_CLONES}/demo',
+      base_branch: 'main',
+      options: {},
+    })
+    expect(parsed.build).toBeUndefined()
   })
 })

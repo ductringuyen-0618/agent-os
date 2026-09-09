@@ -5,6 +5,8 @@ import { CostsPanel } from './panels/CostsPanel'
 import { DecisionsPanel } from './panels/DecisionsPanel'
 import { MessagesPanel } from './panels/MessagesPanel'
 import { OverviewPanel } from './panels/OverviewPanel'
+import { ProjectsPanel } from './panels/ProjectsPanel'
+import { RequestsPanel } from './panels/RequestsPanel'
 import { RoutinesPanel } from './panels/RoutinesPanel'
 import { RunsPanel } from './panels/RunsPanel'
 import { SkillsPanel } from './panels/SkillsPanel'
@@ -18,7 +20,9 @@ export type PanelName =
   | 'skills'
   | 'routines'
   | 'costs'
+  | 'projects'
   | 'messages'
+  | 'requests'
 
 const NAV: Array<{ id: PanelName; label: string; icon: IconName }> = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
@@ -28,7 +32,9 @@ const NAV: Array<{ id: PanelName; label: string; icon: IconName }> = [
   { id: 'skills', label: 'Skills', icon: 'skills' },
   { id: 'routines', label: 'Routines', icon: 'routines' },
   { id: 'costs', label: 'Costs', icon: 'costs' },
+  { id: 'projects', label: 'Projects', icon: 'projects' },
   { id: 'messages', label: 'Messages', icon: 'messages' },
+  { id: 'requests', label: 'Requests', icon: 'requests' },
 ]
 
 function isTyping(target: EventTarget | null) {
@@ -50,7 +56,10 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return
-      const idx = Number.parseInt(e.key, 10) - 1
+      // 1-9 are the first nine panels; 0 stands in for the tenth.
+      const digit = Number.parseInt(e.key, 10)
+      if (Number.isNaN(digit)) return
+      const idx = digit === 0 ? 9 : digit - 1
       if (idx >= 0 && idx < NAV.length) go(NAV[idx].id)
     }
     window.addEventListener('keydown', onKey)
@@ -77,8 +86,14 @@ export default function App() {
     case 'costs':
       panel = <CostsPanel />
       break
+    case 'projects':
+      panel = <ProjectsPanel />
+      break
     case 'messages':
       panel = <MessagesPanel />
+      break
+    case 'requests':
+      panel = <RequestsPanel />
       break
     default:
       panel = <OverviewPanel onNavigate={go} />
@@ -122,7 +137,7 @@ export default function App() {
                     />
                     <span className="flex-1">{n.label}</span>
                     <kbd className="font-mono text-[10px] text-muted/50 group-hover:text-muted">
-                      {i + 1}
+                      {i === 9 ? 0 : i + 1}
                     </kbd>
                   </button>
                 </li>
@@ -130,7 +145,7 @@ export default function App() {
             })}
           </ul>
           <div className="mt-auto px-4 py-3 text-[11px] text-muted/70">
-            Press 1–{NAV.length} to switch panels
+            Press 1–9 and 0 to switch panels
           </div>
         </nav>
         <main className="flex-1 overflow-auto p-6">

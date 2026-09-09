@@ -1,10 +1,15 @@
 import type {
   Decision,
   Event,
+  GithubRepo,
   Message,
+  ProjectConfig,
+  ProjectListItem,
   RoutineConfig,
   Run,
   SkillMeta,
+  WorkflowInstance,
+  WorkflowStep,
 } from '@agentos/shared'
 import { vi } from 'vitest'
 
@@ -45,6 +50,76 @@ export const fixtures = {
     body: 'wiki looks stale, can you re-sync?',
     ts: '2026-09-08T00:00:00Z',
   } satisfies Message,
+  githubRepos: [
+    {
+      nameWithOwner: 'octo/widgets',
+      description: 'Widget factory',
+      defaultBranch: 'main',
+      isPrivate: false,
+      updatedAt: '2026-09-01T00:00:00Z',
+    },
+  ] satisfies GithubRepo[],
+  projectListItem: {
+    config: {
+      name: 'techpulse',
+      adapter: 'techpulse-coo',
+      repo: 'octo/techpulse',
+      clone: '/clones/techpulse',
+      base_branch: 'main',
+      options: {},
+    },
+    routines: ['techpulse-sync'],
+    hasCooLayout: true,
+  } satisfies ProjectListItem,
+  workflow: {
+    id: 'wf_1',
+    kind: 'feature-request',
+    status: 'running',
+    project: 'techpulse',
+    title: 'Add a personalized company digest',
+    input: {
+      project: 'techpulse',
+      title: 'Add a personalized company digest',
+      description: 'Summarize the week per company the user follows.',
+      autoApprove: true,
+    },
+    state: { brief: { costUsd: 0.08 } },
+    currentStep: 'build',
+    createdAt: '2026-09-08T00:00:00Z',
+    startedAt: '2026-09-08T00:00:00Z',
+    updatedAt: '2026-09-08T00:05:00Z',
+  } satisfies WorkflowInstance,
+  workflowSteps: [
+    {
+      id: 'wfs_1',
+      workflowId: 'wf_1',
+      name: 'brief',
+      seq: 1,
+      status: 'succeeded',
+      attempt: 1,
+      output: { costUsd: 0.08 },
+      startedAt: '2026-09-08T00:00:00Z',
+      endedAt: '2026-09-08T00:01:00Z',
+    },
+    {
+      id: 'wfs_2',
+      workflowId: 'wf_1',
+      name: 'build',
+      seq: 2,
+      status: 'running',
+      attempt: 1,
+      runId: 'run_1',
+      startedAt: '2026-09-08T00:01:00Z',
+    },
+  ] satisfies WorkflowStep[],
+  project: {
+    name: 'techpulse',
+    adapter: 'techpulse-coo',
+    repo: 'ductringuyen-0618/techpulse',
+    clone: '/clones/techpulse',
+    base_branch: 'main',
+    options: {},
+  } satisfies ProjectConfig,
 }
 
 type Handler = (url: URL, init?: RequestInit) => unknown
@@ -88,6 +163,40 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
       { day: '2026-09-08', agent: 'ops', costUsd: 0.42 },
     ],
     'GET /api/messages': () => [fixtures.message],
+    'GET /api/github/repos': () => fixtures.githubRepos,
+    'GET /api/projects': () => [fixtures.projectListItem],
+    'POST /api/projects': () => ({
+      project: {
+        name: 'widgets',
+        adapter: 'techpulse-coo',
+        repo: 'octo/widgets',
+        clone: '/clones/widgets',
+        base_branch: 'main',
+        options: {},
+      },
+      sync: { added: [], changed: [], events: [], hasCooLayout: false },
+    }),
+    'DELETE /api/projects/widgets': () => ({ ok: true }),
+    'DELETE /api/projects/techpulse': () => ({ ok: true }),
+    'GET /api/workflows': () => [fixtures.workflow],
+    'GET /api/workflows/wf_1': () => ({
+      workflow: fixtures.workflow,
+      steps: fixtures.workflowSteps,
+    }),
+    'POST /api/workflows': () => ({ workflowId: 'wf_2' }),
+    'POST /api/workflows/wf_1/pause': () => ({
+      ...fixtures.workflow,
+      status: 'paused',
+    }),
+    'POST /api/workflows/wf_1/resume': () => ({
+      ...fixtures.workflow,
+      status: 'running',
+    }),
+    'POST /api/workflows/wf_1/terminate': () => ({
+      ...fixtures.workflow,
+      status: 'terminated',
+    }),
+    'POST /api/workflows/wf_1/events': () => ({ id: 2 }),
     ...overrides,
   }
   vi.stubGlobal(
@@ -101,6 +210,7 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
           status: 404,
         })
       const body = handler(url, init)
+      if (body instanceof Response) return body
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'content-type': 'application/json' },

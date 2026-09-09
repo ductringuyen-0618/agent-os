@@ -37,7 +37,12 @@ export interface RoutineConfig {
   daily_budget_usd?: number
 }
 
+export interface WorkflowsConfig {
+  max_concurrent: number
+}
+
 export interface RoutinesFile {
   defaults: RoutineDefaults
   routines: RoutineConfig[]
+  workflows?: WorkflowsConfig
 }

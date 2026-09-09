@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "key": "ran_every_check",
+      "weight": 0.4,
+      "description": "Every command in payload.checks was actually executed, none skipped or summarized without running."
+    },
+    {
+      "key": "correct_pass_fail_line",
+      "weight": 0.3,
+      "description": "Final message's first line is exactly PASS or FAIL and matches whether every check exited 0."
+    },
+    {
+      "key": "useful_failure_tails",
+      "weight": 0.3,
+      "description": "Each failing check's output tail is complete enough for feature-build to fix it without re-running the check."
+    }
+  ]
+}

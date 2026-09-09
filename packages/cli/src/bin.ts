@@ -5,12 +5,15 @@ import { registerApprove } from './commands/approve.js'
 import { registerDecisions } from './commands/decisions.js'
 import { runInit } from './commands/init.js'
 import { logs } from './commands/logs.js'
+import { registerProjectsCommand } from './commands/projects.js'
 import { ps } from './commands/ps.js'
 import { registerReject } from './commands/reject.js'
+import { requestFeature } from './commands/request.js'
 import { registerRoutinesCommand } from './commands/routines.js'
 import { run as runCommand } from './commands/run.js'
 import { registerSync } from './commands/sync.js'
 import { up } from './commands/up.js'
+import { registerWorkflowsCommand } from './commands/workflows.js'
 
 const program = new Command()
 program.name('agentos').description('agent-os CLI').version('0.1.0')
@@ -69,10 +72,31 @@ program
     })
   })
 
+program
+  .command('request <project> <title>')
+  .description('open a feature request: proposal, build, validate, review, PR')
+  .option('--description <text>', 'the feature description')
+  .option('--file <path>', 'read the description from a file')
+  .option(
+    '--no-auto-approve',
+    'require manual approval of the proposal before building',
+  )
+  .action(async (project: string, title: string, opts) => {
+    await requestFeature(client(), {
+      project,
+      title,
+      description: opts.description,
+      file: opts.file,
+      autoApprove: opts.autoApprove,
+    })
+  })
+
 registerRoutinesCommand(program, client())
+registerWorkflowsCommand(program, client())
 registerDecisions(program, client())
 registerApprove(program, client())
 registerReject(program, client())
 registerSync(program, client())
+registerProjectsCommand(program, client())
 
 program.parseAsync(process.argv)

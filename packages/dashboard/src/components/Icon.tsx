@@ -7,6 +7,8 @@ export type IconName =
   | 'routines'
   | 'costs'
   | 'messages'
+  | 'projects'
+  | 'requests'
   | 'close'
   | 'check'
   | 'x'
@@ -24,6 +26,8 @@ const PATHS: Record<IconName, string> = {
   routines: 'M12 3a9 9 0 110 18 9 9 0 010-18z M12 7v5l3 2',
   costs: 'M4 20V10 M10 20V4 M16 20v-7 M22 20H2',
   messages: 'M4 4h16v13H8l-4 4z',
+  projects: 'M4 4h6l2 2h8v12H4z',
+  requests: 'M3 11l18-7-7 18-2-8-8-3z',
   close: 'M6 6l12 12 M18 6L6 18',
   check: 'M4 12l5 5L20 6',
   x: 'M6 6l12 12 M18 6L6 18',

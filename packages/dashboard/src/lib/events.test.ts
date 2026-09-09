@@ -43,6 +43,44 @@ describe('describeEvent', () => {
   })
 })
 
+describe('workflow events', () => {
+  it('classifies every workflow.* event as run (machine acting)', () => {
+    expect(classifyEvent('workflow.created')).toBe('run')
+    expect(classifyEvent('workflow.step.started')).toBe('run')
+    expect(classifyEvent('workflow.step.failed')).toBe('run')
+    expect(classifyEvent('workflow.succeeded')).toBe('run')
+  })
+
+  it('writes one plain sentence per workflow event', () => {
+    expect(
+      describeEvent(ev('workflow.created', { title: 'Add dark mode' })),
+    ).toBe('Request started: Add dark mode')
+    expect(describeEvent(ev('workflow.step.started', { step: 'build' }))).toBe(
+      'build started',
+    )
+    expect(
+      describeEvent(ev('workflow.step.succeeded', { step: 'build' })),
+    ).toBe('build finished')
+    expect(
+      describeEvent(ev('workflow.step.failed', { step: 'validate' })),
+    ).toBe('validate failed')
+    expect(
+      describeEvent(ev('workflow.waiting', { step: 'await-approval' })),
+    ).toBe('Waiting on await-approval')
+    expect(describeEvent(ev('workflow.resumed', {}))).toBe('Request resumed')
+    expect(describeEvent(ev('workflow.paused', {}))).toBe('Request paused')
+    expect(describeEvent(ev('workflow.succeeded', {}))).toBe(
+      'Request completed',
+    )
+    expect(describeEvent(ev('workflow.failed', { step: 'validate' }))).toBe(
+      'Request failed at validate',
+    )
+    expect(describeEvent(ev('workflow.terminated', {}))).toBe(
+      'Request terminated',
+    )
+  })
+})
+
 describe('feedItemsFromHistory + mergeFeed', () => {
   it('seeds from runs and decisions, newest first, de-duplicated', () => {
     const items = feedItemsFromHistory(

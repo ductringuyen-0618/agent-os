@@ -1,4 +1,12 @@
-import type { Event, Run, RunStatus } from '@agentos/shared'
+import type {
+  Event,
+  Run,
+  RunStatus,
+  WorkflowInstance,
+  WorkflowStatus,
+  WorkflowStep,
+  WorkflowStepStatus,
+} from '@agentos/shared'
 
 export class FakeEventLog {
   runs: Run[] = []
@@ -10,6 +18,8 @@ export class FakeEventLog {
     payload?: Record<string, unknown>
     firedAt?: string
   }> = []
+  workflows: WorkflowInstance[] = []
+  workflowSteps: WorkflowStep[] = []
   private subs: Array<(e: Event) => void> = []
   private seq = 0
 
@@ -18,6 +28,23 @@ export class FakeEventLog {
     this.events.push(full)
     for (const cb of this.subs) cb(full)
     return full
+  }
+  listEvents(
+    opts: {
+      runId?: string
+      sinceId?: number
+      types?: Event['type'][]
+      limit?: number
+    } = {},
+  ): Event[] {
+    let list = this.events.filter(
+      (e) =>
+        (!opts.runId || e.runId === opts.runId) &&
+        (opts.sinceId === undefined || e.id > opts.sinceId) &&
+        (!opts.types || opts.types.length === 0 || opts.types.includes(e.type)),
+    )
+    list = list.slice().sort((a, b) => a.id - b.id)
+    return opts.limit ? list.slice(0, opts.limit) : list
   }
   createRun(
     r: Omit<Run, 'id' | 'status' | 'attempt'> & { attempt?: number },
@@ -72,6 +99,83 @@ export class FakeEventLog {
   markScheduleFired(id: string, firedAtIso: string): void {
     const s = this.schedules.find((x) => x.id === id)
     if (s) s.firedAt = firedAtIso
+  }
+  createWorkflow(w: {
+    kind: string
+    project?: string
+    title: string
+    input: Record<string, unknown>
+  }): WorkflowInstance {
+    const now = new Date().toISOString()
+    const wf: WorkflowInstance = {
+      id: `wf-${++this.seq}`,
+      kind: w.kind,
+      status: 'queued',
+      project: w.project,
+      title: w.title,
+      input: w.input,
+      state: {},
+      createdAt: now,
+      updatedAt: now,
+    }
+    this.workflows.push(wf)
+    return wf
+  }
+  getWorkflow(id: string): WorkflowInstance | undefined {
+    return this.workflows.find((w) => w.id === id)
+  }
+  listWorkflows(
+    opts: { status?: WorkflowStatus; kind?: string; project?: string } = {},
+  ): WorkflowInstance[] {
+    return this.workflows.filter(
+      (w) =>
+        (!opts.status || w.status === opts.status) &&
+        (!opts.kind || w.kind === opts.kind) &&
+        (!opts.project || w.project === opts.project),
+    )
+  }
+  updateWorkflow(
+    id: string,
+    patch: Partial<WorkflowInstance>,
+  ): WorkflowInstance {
+    const wf = this.workflows.find((w) => w.id === id)
+    if (!wf) throw new Error(`no workflow ${id}`)
+    Object.assign(wf, patch, { updatedAt: new Date().toISOString() })
+    return wf
+  }
+  createWorkflowStep(s: {
+    workflowId: string
+    name: string
+    seq: number
+    status: WorkflowStepStatus
+    attempt?: number
+  }): WorkflowStep {
+    const step: WorkflowStep = {
+      id: `wfs-${++this.seq}`,
+      workflowId: s.workflowId,
+      name: s.name,
+      seq: s.seq,
+      status: s.status,
+      attempt: s.attempt ?? 1,
+      startedAt: new Date().toISOString(),
+    }
+    this.workflowSteps.push(step)
+    return step
+  }
+  listWorkflowSteps(workflowId: string): WorkflowStep[] {
+    return this.workflowSteps
+      .filter((s) => s.workflowId === workflowId)
+      .slice()
+      .sort((a, b) => a.seq - b.seq)
+  }
+  updateWorkflowStep(id: string, patch: Partial<WorkflowStep>): WorkflowStep {
+    const step = this.workflowSteps.find((s) => s.id === id)
+    if (!step) throw new Error(`no workflow step ${id}`)
+    Object.assign(step, patch)
+    return step
+  }
+  deleteWorkflowStep(id: string): void {
+    this.workflowSteps = this.workflowSteps.filter((s) => s.id !== id)
   }
   costForRoutineToday(routine: string): number {
     const todayPrefix = new Date().toISOString().slice(0, 10)

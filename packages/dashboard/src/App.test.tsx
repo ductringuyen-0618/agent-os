@@ -37,4 +37,39 @@ describe('App', () => {
     await userEvent.type(screen.getByLabelText('scratch'), '7')
     expect(screen.getByRole('heading', { name: 'Runs' })).toBeInTheDocument()
   })
+
+  it('switches to the Projects panel', async () => {
+    installMockFetch()
+    render(<App />)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Projects', exact: true }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Projects' }),
+    ).toBeInTheDocument()
+  })
+
+  it('opens the Requests panel from the left nav', async () => {
+    installMockFetch()
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
+    render(<App />)
+    // Overview's own "Requests in flight" stat button also matches
+    // /Requests/, so this needs an exact match on the nav item's label.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Requests', exact: true }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Requests' }),
+    ).toBeInTheDocument()
+  })
+
+  it('reaches the tenth panel with the 0 key', async () => {
+    installMockFetch()
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
+    render(<App />)
+    await userEvent.keyboard('0')
+    expect(
+      await screen.findByRole('heading', { name: 'Requests' }),
+    ).toBeInTheDocument()
+  })
 })

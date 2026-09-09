@@ -12,6 +12,10 @@
     "./adapters/types": {
       "types": "./dist/adapters/types.d.ts",
       "import": "./dist/adapters/types.js"
+    },
+    "./wiki/redact": {
+      "types": "./dist/wiki/redact.d.ts",
+      "import": "./dist/wiki/redact.js"
     }
   },
   "scripts": {

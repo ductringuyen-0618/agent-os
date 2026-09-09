@@ -1,13 +1,19 @@
 import type { SyncResult } from '@agentos/kernel/adapters/types'
 import type {
+  AddProjectRequest,
+  AddProjectResponse,
   CreateRunRequest,
   CreateRunResponse,
   Decision,
   DecisionStatus,
   Event,
   HealthResponse,
+  ProjectListItem,
   RoutineConfig,
   Run,
+  WorkflowInstance,
+  WorkflowStatus,
+  WorkflowStep,
 } from '@agentos/shared'
 
 export interface RoutineListItem {
@@ -113,5 +119,56 @@ export class ApiClient {
 
   syncProject(name: string): Promise<SyncResult> {
     return this.request(`/api/projects/${name}/sync`, { method: 'POST' })
+  }
+
+  listWorkflows(
+    opts: { status?: WorkflowStatus; project?: string; kind?: string } = {},
+  ): Promise<WorkflowInstance[]> {
+    const params = new URLSearchParams()
+    if (opts.status) params.set('status', opts.status)
+    if (opts.project) params.set('project', opts.project)
+    if (opts.kind) params.set('kind', opts.kind)
+    const qs = params.toString()
+    return this.request(`/api/workflows${qs ? `?${qs}` : ''}`)
+  }
+
+  getWorkflow(
+    id: string,
+  ): Promise<{ workflow: WorkflowInstance; steps: WorkflowStep[] }> {
+    return this.request(`/api/workflows/${id}`)
+  }
+
+  createWorkflow(body: {
+    kind: string
+    project?: string
+    title?: string
+    input: Record<string, unknown>
+  }): Promise<{ workflowId: string }> {
+    return this.request('/api/workflows', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
+  pauseWorkflow(id: string): Promise<WorkflowInstance> {
+    return this.request(`/api/workflows/${id}/pause`, { method: 'POST' })
+  }
+
+  resumeWorkflow(id: string): Promise<WorkflowInstance> {
+    return this.request(`/api/workflows/${id}/resume`, { method: 'POST' })
+  }
+
+  terminateWorkflow(id: string): Promise<WorkflowInstance> {
+    return this.request(`/api/workflows/${id}/terminate`, { method: 'POST' })
+  }
+  listProjects(): Promise<ProjectListItem[]> {
+    return this.request('/api/projects')
+  }
+
+  addProject(input: AddProjectRequest): Promise<AddProjectResponse> {
+    return this.request('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
   }
 }

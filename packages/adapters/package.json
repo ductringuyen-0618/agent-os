@@ -16,6 +16,7 @@
   "dependencies": {
     "@agentos/kernel": "workspace:*",
     "@agentos/shared": "workspace:*",
+    "execa": "^9",
     "gray-matter": "^4",
     "simple-git": "^3"
   },

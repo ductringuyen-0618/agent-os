@@ -35,6 +35,9 @@ importers:
       '@agentos/shared':
         specifier: workspace:*
         version: link:../shared
+      execa:
+        specifier: ^9
+        version: 9.6.1
       gray-matter:
         specifier: ^4
         version: 4.0.3
@@ -70,6 +73,9 @@ importers:
       '@types/node':
         specifier: ^22
         version: 22.20.1
+      simple-git:
+        specifier: ^3
+        version: 3.36.0
 
   packages/dashboard:
     dependencies:
