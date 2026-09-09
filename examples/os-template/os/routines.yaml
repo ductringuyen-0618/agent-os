@@ -14,7 +14,11 @@ routines:
     allowed_tools: [mcp__agentos__emit_event, mcp__agentos__remember, mcp__agentos__schedule, mcp__agentos__read_wiki]
   - name: techpulse-sync
     every: 1h
-    adapter: techpulse-coo
+    # AdapterHost.sync(projectName) matches by the *project's* `name` field
+    # (os/projects/techpulse.yaml has name: techpulse, adapter:
+    # techpulse-coo) -- this must be the project name, not the adapter type,
+    # or every fire fails with "unknown project 'techpulse-coo'".
+    adapter: techpulse
   - name: ingest
     on: [raw.added]
     skill: ingest

@@ -59,7 +59,13 @@ class KernelImpl implements Kernel {
     this.routinesFile ??= await loadRoutinesFile(this.cfg.osRoot)
 
     if (routine.adapter) {
-      await this.adapters.sync(routine.adapter) // no-op until M4 registers real adapters
+      // routine.adapter here is a *project name* (matched against
+      // AdapterHost.loadProjects()'s project.name), not a ProjectAdapter
+      // type -- e.g. routines.yaml's techpulse-sync routine sets
+      // `adapter: techpulse`, the project config's `name`, while that
+      // project's own `adapter: techpulse-coo` field says which
+      // ProjectAdapter implementation handles it.
+      await this.adapters.sync(routine.adapter)
       return
     }
     if (!routine.skill || !routine.agent) {
