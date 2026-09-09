@@ -6,8 +6,9 @@ import type {
   ProjectAdapter,
   SyncResult,
 } from '@agentos/kernel/adapters/types'
+import type { Decision } from '@agentos/shared'
 import simpleGit from 'simple-git'
-import { readStatus } from './frontmatter.js'
+import { readStatus, setStatus } from './frontmatter.js'
 
 interface TechpulseCooOptions {
   proposals_path: string
@@ -181,8 +182,81 @@ export const techpulseCooAdapter: ProjectAdapter = {
 
     return result
   },
-  async applyDecision() {
-    throw new Error('techpulse-coo applyDecision not implemented')
+  async applyDecision(decision: Decision, ctx: AdapterContext): Promise<void> {
+    const opts = ctx.project.options as unknown as TechpulseCooOptions
+    const git = simpleGit(ctx.project.clone)
+    try {
+      await git.checkout(ctx.project.base_branch)
+      await git.pull('origin', ctx.project.base_branch, ['--ff-only'])
+
+      const file = decision.ref
+      if (!file) throw new Error(`decision ${decision.id} has no ref`)
+      const filePath = path.join(
+        ctx.project.clone,
+        opts.proposals_path,
+        path.basename(file),
+      )
+      const content = await readFile(filePath, 'utf8')
+      const targetStatus =
+        decision.status === 'rejected' ? 'rejected' : 'approved'
+      await writeFile(filePath, setStatus(content, targetStatus), 'utf8')
+
+      const slug = path.basename(file).replace(/\.md$/, '')
+      const verb = targetStatus === 'approved' ? 'approve' : 'reject'
+      await git.add([path.join(opts.proposals_path, path.basename(file))])
+      const subject = `chore(coo): ${verb} ${slug}`
+      const commitResult = await git.commit(
+        `${subject}\n\nCo-Authored-By: Claude via agent-os <noreply@anthropic.com>`,
+      )
+      ctx.log.append({
+        type: 'git.commit',
+        runId: ctx.runId,
+        payload: {
+          decisionId: decision.id,
+          sha: commitResult.commit,
+          message: subject,
+        },
+      })
+
+      await git.push('origin', ctx.project.base_branch)
+      ctx.log.append({
+        type: 'git.push',
+        runId: ctx.runId,
+        payload: { decisionId: decision.id, branch: ctx.project.base_branch },
+      })
+
+      const date = new Date().toISOString().slice(0, 10)
+      const approvalPath = path.join(
+        ctx.cfg.osRoot,
+        'output',
+        'approvals',
+        `${date}-${slug}.md`,
+      )
+      await mkdir(path.dirname(approvalPath), { recursive: true })
+      await writeFile(
+        approvalPath,
+        `# ${verb === 'approve' ? 'Approved' : 'Rejected'}: ${slug}\n\n- decision: ${targetStatus}\n- timestamp: ${new Date().toISOString()}\n- commit: ${commitResult.commit}\n`,
+        'utf8',
+      )
+
+      await ctx.wiki.writePage({
+        path: `projects/techpulse/proposals/${slug}.md`,
+        content: `# ${slug}\n\nStatus: ${targetStatus}\n\nDecision ${decision.id} resolved as ${targetStatus} (commit ${commitResult.commit}).\n`,
+        op: 'decision',
+        runId: ctx.runId,
+      })
+
+      ctx.log.resolveDecision(decision.id, targetStatus)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      ctx.log.resolveDecision(decision.id, 'error', message)
+      ctx.log.append({
+        type: 'ops.alert',
+        runId: ctx.runId,
+        payload: { decisionId: decision.id, error: message },
+      })
+      throw err
+    }
   },
 }
 
