@@ -282,4 +282,37 @@ describe('WorkflowEngine step.run cwdPolicy', () => {
     expect(mainSpec.addDirs).toContain(outsideCwd)
     expect(mainSpec.addDirs).toContain(osRoot)
   })
+
+  it('never calls cwdPolicy when cwd is inside the agent workspace (default cwd, or an explicit one under it)', async () => {
+    const osRoot = await makeOsRoot()
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(':memory:')
+    const pm = new ProcessManager(cfg, log)
+    pm.runToCompletion = vi
+      .fn()
+      .mockResolvedValue({ status: 'success', sessionId: 's1' })
+    const cwdPolicy = vi.fn()
+    const engine = new WorkflowEngine(cfg, log, pm, cwdPolicy)
+    const def: WorkflowDefinition = {
+      kind: 'inside-workspace',
+      async run(ctx) {
+        // no spec.cwd at all -- defaults to the agent's workspace
+        await ctx.step.run('a', { skill: 'brief', agent: 'ops' })
+        // an explicit cwd that is itself under the agent's workspace
+        await ctx.step.run('b', {
+          skill: 'brief',
+          agent: 'ops',
+          cwd: path.join(osRoot, 'agents', 'ops', 'workspace', 'nested'),
+        })
+      },
+    }
+    engine.registry.register(def)
+
+    const instance = await engine.create('inside-workspace', {})
+    await waitForStatus(engine, instance.id, ['succeeded', 'failed'])
+
+    expect(engine.get(instance.id)?.status).toBe('succeeded')
+    expect(cwdPolicy).not.toHaveBeenCalled()
+    expect(pm.runToCompletion).toHaveBeenCalledTimes(2)
+  })
 })
