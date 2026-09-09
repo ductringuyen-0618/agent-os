@@ -39,7 +39,7 @@ export interface WorkflowStepApi {
 }
 
 export interface WorkflowContext<I = Record<string, unknown>> {
-  /** The workflow instance's own id (the `workflows.id` row) -- stable across every replay, so a definition can key collision-free output paths (e.g. `output/requests/<id>/proposal.md`) off it without threading an id through `input`. */
+  /** The workflow instance's own id (the `workflows.id` row) -- stable across every replay, so a definition can key collision-free output paths (e.g. `requests/<id>/proposal.md`) off it without threading an id through `input`. */
   readonly id: string
   input: I
   state: Record<string, unknown>

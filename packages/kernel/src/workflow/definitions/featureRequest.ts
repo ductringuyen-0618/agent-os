@@ -220,7 +220,7 @@ export function createFeatureRequestWorkflow(
       const ops = requireFeatureRequestOps(deps, project)
       const actx = adapterContext(kernel, project, ctx.id)
       const slug = slugify(ctx.input.title)
-      const proposalPath = `output/requests/${ctx.id}/proposal.md`
+      const proposalPath = `requests/${ctx.id}/proposal.md`
 
       const briefRun = await ctx.step.run(
         'brief',
@@ -372,7 +372,7 @@ export function createFeatureRequestWorkflow(
 
       await ctx.step.do('done', {}, async () => {
         await kernel.wiki.writePage({
-          path: `output/requests/${ctx.id}/summary.md`,
+          path: `requests/${ctx.id}/summary.md`,
           content: renderSummary(ctx.input, {
             slug,
             branch,

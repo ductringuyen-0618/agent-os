@@ -329,7 +329,7 @@ describe('createFeatureRequestWorkflow', () => {
       'review',
     ])
 
-    const summary = await wiki.readPage('output/requests/wf-3/summary.md')
+    const summary = await wiki.readPage('requests/wf-3/summary.md')
     expect(summary).toContain('pull request')
     const requestPage = await wiki.readPage(
       'projects/sandbox/requests/add-dark-mode-toggle.md',

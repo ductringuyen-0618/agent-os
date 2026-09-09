@@ -47,6 +47,6 @@ digest; do not attempt to fix it yourself.
   stays read-only regardless: `Read, Glob, Grep`, no `Bash`.
 - None of these four ever call `mcp__agentos__remember` except
   `feature-brief` (and only once, at the path it's given) — the workflow
-  itself, not the agent, does every `wiki/output/requests/`,
+  itself, not the agent, does every `wiki/requests/`,
   `wiki/projects/<project>/requests/`, and `docs/missions/coo/` write
   that happens outside `feature-brief`'s single call.

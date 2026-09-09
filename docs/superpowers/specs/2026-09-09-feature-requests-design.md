@@ -237,14 +237,14 @@ interface FeatureRequestInput {
 
 | seq | step | kind | what it does |
 |---|---|---|---|
-| 1 | `brief` | `step.run` (skill `feature-brief`, agent `ops`, plan mode, no file tools) | Reads the project's wiki overview and the description, writes the full proposal markdown (What you get, Why start this now, Problem, Proposed solution, Effort, Validation contract, Risks) via `mcp__agentos__remember` to `output/requests/<id>/proposal.md`. Output: proposal path, slug, next NNN. |
+| 1 | `brief` | `step.run` (skill `feature-brief`, agent `ops`, plan mode, no file tools) | Reads the project's wiki overview and the description, writes the full proposal markdown (What you get, Why start this now, Problem, Proposed solution, Effort, Validation contract, Risks) via `mcp__agentos__remember` to `requests/<id>/proposal.md`. Output: proposal path, slug, next NNN. |
 | 2 | `push-proposal` | `step.do` | Adapter commits `docs/missions/coo/proposals/NNN-slug.md` with `status: approved` (or `proposed` when `autoApprove` is false), bootstrapping the COO layout if missing; pushes to `base_branch`; syncs so the Decision row exists (already approved). Output: commit sha, file. |
 | 3 | `await-approval` | `step.waitForEvent('decision.resolved')` | Only when `autoApprove` is false. Timeout 7 days. |
 | 4 | `build` | `step.run` (skill `feature-build`, cwd = clone, project `build` grants) | Creates branch `req/<slug>`, implements per the validation contract, commits as it goes. Output: branch, head sha, files changed. |
 | 5 | `validate` | `step.run` (skill `feature-validate`, same cwd, Bash only) | Runs every `build.checks` command; must actually run them; output: pass/fail per check with tails of failing output. Fails the step if any check fails; the engine retries `build` once with the failure output injected (a `fix` sub-attempt), then fails the instance. |
 | 6 | `review` | `step.run` (skill `feature-review`, plan mode, read-only) | Product/professional-feel review against the proposal; output: pass/fail with reasons. Fail follows the same one-retry path as validate. |
 | 7 | `open-pr` | `step.do` | Pushes the branch, opens a PR via `gh pr create` with the proposal's What/Why and the validation and review outputs as the body; flips the proposal to `status: shipped` on `base_branch`; writes `reports/<slug>.md`. Output: PR URL. |
-| 8 | `done` | `step.do` | Writes `output/requests/<id>/summary.md`, `remember`s a wiki page `projects/<project>/requests/<slug>.md`, emits `workflow.succeeded`. |
+| 8 | `done` | `step.do` | Writes `requests/<id>/summary.md`, `remember`s a wiki page `projects/<project>/requests/<slug>.md`, emits `workflow.succeeded`. |
 
 Skills live in the template under `os/skills/feature-{brief,build,validate,review}/skill.md` with the same `learnings.md`/`eval.json` layout as existing skills. `feature-build` and `feature-validate` are the first skills that run outside `agents/<name>/workspace`; the kernel allows this only when the spawning workflow's project has `build.enabled: true`, and it passes `--add-dir <clone>` plus the OS root, nothing else.
 
