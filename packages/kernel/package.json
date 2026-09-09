@@ -8,7 +8,7 @@
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --out-dir dist",
+    "build": "tsup src/index.ts --format esm --dts --out-dir dist && node -e \"require('fs').copyFileSync('src/log/schema.sql','dist/schema.sql')\"",
     "test": "vitest run"
   },
   "dependencies": {
