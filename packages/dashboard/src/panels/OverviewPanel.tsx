@@ -1,4 +1,4 @@
-import type { Decision, Run } from '@agentos/shared'
+import type { Decision, Run, WorkflowInstance } from '@agentos/shared'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   type AgentStatus,
@@ -22,6 +22,7 @@ import {
   mergeFeed,
 } from '../lib/events'
 import { todayKey, usd } from '../lib/time'
+import { isInFlight } from '../lib/workflow'
 
 const client = new ApiClient()
 
@@ -30,11 +31,14 @@ interface Snapshot {
   decisions: Decision[]
   runs: Run[]
   costs: CostEntry[]
+  workflows: WorkflowInstance[]
 }
 
 export function OverviewPanel({
   onNavigate,
-}: { onNavigate?: (panel: 'decisions' | 'runs' | 'costs') => void }) {
+}: {
+  onNavigate?: (panel: 'decisions' | 'runs' | 'costs' | 'requests') => void
+}) {
   const [snap, setSnap] = useState<Snapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [openRun, setOpenRun] = useState<string | null>(null)
@@ -48,9 +52,10 @@ export function OverviewPanel({
       client.listDecisions('pending'),
       client.listRuns({ limit: 100 }),
       client.costs(14),
+      client.listWorkflows(),
     ])
-      .then(([agents, decisions, runs, costs]) =>
-        setSnap({ agents, decisions, runs, costs }),
+      .then(([agents, decisions, runs, costs, workflows]) =>
+        setSnap({ agents, decisions, runs, costs, workflows }),
       )
       .catch((e) =>
         setError(e instanceof ApiError ? e.message : 'Failed to load overview'),
@@ -58,7 +63,10 @@ export function OverviewPanel({
   }, [])
 
   const lifecycleCount = events.filter(
-    (e) => e.type.startsWith('run.') || e.type.startsWith('decision.'),
+    (e) =>
+      e.type.startsWith('run.') ||
+      e.type.startsWith('decision.') ||
+      e.type.startsWith('workflow.'),
   ).length
   // biome-ignore lint/correctness/useExhaustiveDependencies: lifecycleCount re-fetches when a run or decision changes state
   useEffect(() => {
@@ -122,6 +130,8 @@ export function OverviewPanel({
       .reduce((s, c) => s + c.costUsd, 0) ?? 0
   const spend14 = snap?.costs.reduce((s, c) => s + c.costUsd, 0) ?? 0
   const waiting = snap?.decisions.length ?? 0
+  const requestsInFlight =
+    snap?.workflows.filter((w) => isInFlight(w.status)).length ?? 0
 
   return (
     <section className="flex flex-col gap-4">
@@ -141,7 +151,7 @@ export function OverviewPanel({
       {!error && <PulseStrip ticks={ticks} now={now} live={connected} />}
 
       {!error && (
-        <dl className="grid grid-cols-4 gap-3">
+        <dl className="grid grid-cols-5 gap-3">
           <Stat
             label="Agents"
             value={snap ? String(snap.agents.length) : null}
@@ -160,6 +170,13 @@ export function OverviewPanel({
             note={waiting > 0 ? 'needs a decision' : 'nothing pending'}
             tone={waiting > 0 ? 'signal' : undefined}
             onClick={onNavigate ? () => onNavigate('decisions') : undefined}
+          />
+          <Stat
+            label="Requests in flight"
+            value={snap ? String(requestsInFlight) : null}
+            note={requestsInFlight > 0 ? 'building now' : 'nothing in flight'}
+            tone={requestsInFlight > 0 ? 'accent' : undefined}
+            onClick={onNavigate ? () => onNavigate('requests') : undefined}
           />
           <Stat
             label="Runs today"

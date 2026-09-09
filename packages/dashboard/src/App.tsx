@@ -5,6 +5,7 @@ import { CostsPanel } from './panels/CostsPanel'
 import { DecisionsPanel } from './panels/DecisionsPanel'
 import { MessagesPanel } from './panels/MessagesPanel'
 import { OverviewPanel } from './panels/OverviewPanel'
+import { RequestsPanel } from './panels/RequestsPanel'
 import { RoutinesPanel } from './panels/RoutinesPanel'
 import { RunsPanel } from './panels/RunsPanel'
 import { SkillsPanel } from './panels/SkillsPanel'
@@ -19,6 +20,7 @@ export type PanelName =
   | 'routines'
   | 'costs'
   | 'messages'
+  | 'requests'
 
 const NAV: Array<{ id: PanelName; label: string; icon: IconName }> = [
   { id: 'overview', label: 'Overview', icon: 'overview' },
@@ -29,6 +31,7 @@ const NAV: Array<{ id: PanelName; label: string; icon: IconName }> = [
   { id: 'routines', label: 'Routines', icon: 'routines' },
   { id: 'costs', label: 'Costs', icon: 'costs' },
   { id: 'messages', label: 'Messages', icon: 'messages' },
+  { id: 'requests', label: 'Requests', icon: 'requests' },
 ]
 
 function isTyping(target: EventTarget | null) {
@@ -79,6 +82,9 @@ export default function App() {
       break
     case 'messages':
       panel = <MessagesPanel />
+      break
+    case 'requests':
+      panel = <RequestsPanel />
       break
     default:
       panel = <OverviewPanel onNavigate={go} />

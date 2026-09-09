@@ -71,4 +71,20 @@ describe('OverviewPanel', () => {
     )
     expect(onNavigate).toHaveBeenCalledWith('decisions')
   })
+
+  it('shows requests in flight and jumps to Requests from the stat card', async () => {
+    setup()
+    const onNavigate = vi.fn()
+    render(
+      <ToastProvider>
+        <OverviewPanel onNavigate={onNavigate} />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('Requests in flight')).toBeInTheDocument()
+    expect(screen.getByText('building now')).toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: /Requests in flight/ }),
+    )
+    expect(onNavigate).toHaveBeenCalledWith('requests')
+  })
 })
