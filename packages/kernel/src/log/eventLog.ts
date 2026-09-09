@@ -331,6 +331,50 @@ export class EventLog {
     return () => this.subscribers.delete(cb)
   }
 
+  createSchedule(s: {
+    skill: string
+    whenAt: string
+    payload?: Record<string, unknown>
+  }): { id: string } {
+    const id = nanoid()
+    this.db
+      .prepare(
+        'INSERT INTO schedules (id, skill, when_at, payload) VALUES (?, ?, ?, ?)',
+      )
+      .run(id, s.skill, s.whenAt, s.payload ? JSON.stringify(s.payload) : null)
+    return { id }
+  }
+
+  dueSchedules(nowIso: string): Array<{
+    id: string
+    skill: string
+    whenAt: string
+    payload?: Record<string, unknown>
+  }> {
+    const rows = this.db
+      .prepare(
+        'SELECT id, skill, when_at as whenAt, payload FROM schedules WHERE fired_at IS NULL AND when_at <= ?',
+      )
+      .all(nowIso) as Array<{
+      id: string
+      skill: string
+      whenAt: string
+      payload: string | null
+    }>
+    return rows.map((r) => ({
+      id: r.id,
+      skill: r.skill,
+      whenAt: r.whenAt,
+      payload: r.payload ? JSON.parse(r.payload) : undefined,
+    }))
+  }
+
+  markScheduleFired(id: string, firedAtIso: string): void {
+    this.db
+      .prepare('UPDATE schedules SET fired_at = ? WHERE id = ?')
+      .run(firedAtIso, id)
+  }
+
   close(): void {
     this.db.close()
   }
