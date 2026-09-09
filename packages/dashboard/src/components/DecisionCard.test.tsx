@@ -6,7 +6,7 @@ import { DecisionCard } from './DecisionCard'
 import { ToastProvider } from './Toast'
 
 describe('DecisionCard', () => {
-  it('approves optimistically and calls onResolved', async () => {
+  it('asks for confirmation, then approves optimistically', async () => {
     installMockFetch()
     const onResolved = vi.fn()
     render(
@@ -15,10 +15,54 @@ describe('DecisionCard', () => {
       </ToastProvider>,
     )
     expect(screen.getByText('Approve proposal')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /approve/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    // Nothing happens until the person confirms.
+    expect(onResolved).not.toHaveBeenCalled()
+    const dialog = screen.getByRole('alertdialog')
+    expect(dialog).toHaveTextContent(/marks this decision approved/i)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Confirm approval' }),
+    )
     expect(onResolved).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'approved' }),
     )
+    expect(
+      await screen.findByText(/Approved: Approve proposal/),
+    ).toBeInTheDocument()
+  })
+
+  it('explains the git side effects for adapter-backed decisions', async () => {
+    installMockFetch()
+    render(
+      <ToastProvider>
+        <DecisionCard
+          decision={{
+            ...fixtures.decision,
+            adapter: 'techpulse-coo',
+            ref: 'proposals/001.md',
+          }}
+          onResolved={() => {}}
+        />
+      </ToastProvider>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Reject' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      /proposals\/001\.md as rejected .* commits .* pushes/i,
+    )
+  })
+
+  it('cancelling leaves the decision untouched', async () => {
+    installMockFetch()
+    const onResolved = vi.fn()
+    render(
+      <ToastProvider>
+        <DecisionCard decision={fixtures.decision} onResolved={onResolved} />
+      </ToastProvider>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Reject' }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(onResolved).not.toHaveBeenCalled()
   })
 
   it('shows a toast on failed reject', async () => {
@@ -32,7 +76,44 @@ describe('DecisionCard', () => {
         <DecisionCard decision={fixtures.decision} onResolved={() => {}} />
       </ToastProvider>,
     )
-    await userEvent.click(screen.getByRole('button', { name: /reject/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Reject' }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Confirm rejection' }),
+    )
     expect(await screen.findByText(/failed to reject/i)).toBeInTheDocument()
+  })
+
+  it('compact variant shows a one-line summary', () => {
+    installMockFetch()
+    render(
+      <ToastProvider>
+        <DecisionCard
+          decision={fixtures.decision}
+          onResolved={() => {}}
+          variant="compact"
+        />
+      </ToastProvider>,
+    )
+    expect(screen.getByText('Do the thing.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+  })
+})
+
+describe('DecisionCard summary', () => {
+  it('strips list markers from the first body line', () => {
+    installMockFetch()
+    render(
+      <ToastProvider>
+        <DecisionCard
+          decision={{
+            ...fixtures.decision,
+            body: '# T\n\n- **Session**: longer',
+          }}
+          onResolved={() => {}}
+          variant="compact"
+        />
+      </ToastProvider>,
+    )
+    expect(screen.getByText('Session: longer')).toBeInTheDocument()
   })
 })

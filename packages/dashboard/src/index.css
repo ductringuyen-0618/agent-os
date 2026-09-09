@@ -1,20 +1,192 @@
 @import "tailwindcss";
 
+/*
+ * agent-os mission control.
+ *
+ * Two semantic hues only: `accent` (sky) means a machine is alive or acting,
+ * `signal` (amber) means a human is needed. Everything else is quiet indigo.
+ */
 @theme {
-  --color-background: #0b0f14;
-  --color-surface: #111823;
-  --color-border: #1f2a37;
-  --color-text: #e6edf3;
-  --color-muted: #8b98a5;
-  --color-accent: #5eead4;
-  --color-danger: #f87171;
-  --color-warn: #fbbf24;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+  --color-background: #0f1424;
+  --color-surface: #171d33;
+  --color-raised: #1e2540;
+  --color-border: #2a3252;
+  --color-text: #e9ecf5;
+  --color-muted: #8f97b3;
+  --color-accent: #7cc4ff;
+  --color-signal: #f2b84b;
+  --color-warn: #f2b84b;
+  --color-success: #8bd17c;
+  --color-danger: #f2727a;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
+  --animate-pulse-ring: pulse-ring 2.4s ease-out infinite;
+  --animate-slide-in: slide-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-shimmer: shimmer 1.6s linear infinite;
 }
 
-body {
-  background: var(--color-background);
-  color: var(--color-text);
-  font-family: var(--font-sans);
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 35%, transparent);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-accent {
+    @apply border-accent/60 bg-accent/10 text-accent hover:bg-accent/20;
+  }
+  .btn-danger {
+    @apply border-danger/50 bg-danger/10 text-danger hover:bg-danger/20;
+  }
+  .btn-quiet {
+    @apply border-border bg-transparent text-muted hover:border-muted hover:text-text;
+  }
+  .btn-sm {
+    @apply px-2 py-1 text-xs;
+  }
+  .card {
+    @apply rounded-lg border border-border bg-surface;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs text-muted;
+  }
+  .tab {
+    @apply -mb-px border-b-2 border-transparent pb-1.5 text-sm text-muted transition-colors hover:text-text;
+  }
+  .tab-active {
+    @apply border-accent text-text;
+  }
+  .skeleton {
+    @apply animate-shimmer rounded;
+    background: linear-gradient(
+      90deg,
+      var(--color-surface) 0%,
+      var(--color-raised) 50%,
+      var(--color-surface) 100%
+    );
+    background-size: 200% 100%;
+  }
+  .prose-agentos {
+    @apply text-sm leading-relaxed text-text;
+  }
+  .prose-agentos h1 {
+    @apply mt-4 mb-2 text-lg font-semibold;
+  }
+  .prose-agentos h2 {
+    @apply mt-4 mb-1.5 text-base font-semibold;
+  }
+  .prose-agentos h3 {
+    @apply mt-3 mb-1 text-sm font-semibold;
+  }
+  .prose-agentos p {
+    @apply my-2 text-muted;
+  }
+  .prose-agentos ul,
+  .prose-agentos ol {
+    @apply my-2 ml-5 list-disc text-muted;
+  }
+  .prose-agentos ol {
+    @apply list-decimal;
+  }
+  .prose-agentos li {
+    @apply my-0.5;
+  }
+  .prose-agentos strong {
+    @apply font-medium text-text;
+  }
+  .prose-agentos code {
+    @apply rounded bg-background px-1 py-0.5 font-mono text-xs text-accent;
+  }
+  .prose-agentos pre {
+    @apply my-2 overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-xs;
+  }
+  .prose-agentos pre code {
+    @apply bg-transparent p-0 text-text;
+  }
+  .prose-agentos a {
+    @apply text-accent underline decoration-accent/40 underline-offset-2;
+  }
+  .prose-agentos blockquote {
+    @apply my-2 border-l-2 border-border pl-3 text-muted;
+  }
+  .prose-agentos hr {
+    @apply my-4 border-border;
+  }
+  .prose-agentos table {
+    @apply my-2 w-full border-collapse text-xs;
+  }
+  .prose-agentos th,
+  .prose-agentos td {
+    @apply border-b border-border px-2 py-1 text-left;
+  }
 }

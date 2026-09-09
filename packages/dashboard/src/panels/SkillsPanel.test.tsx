@@ -5,11 +5,11 @@ import { fixtures, installMockFetch } from '../../tests/mockServer'
 import { SkillsPanel } from './SkillsPanel'
 
 describe('SkillsPanel', () => {
-  it('lists skills and expands learnings excerpt on click', async () => {
+  it('lists skills with a score and expands learnings on click', async () => {
     installMockFetch()
     render(<SkillsPanel />)
     const row = await screen.findByText(fixtures.skill.name)
-    expect(screen.getByText('0.90')).toBeInTheDocument()
+    expect(screen.getByText('90%')).toBeInTheDocument()
     await userEvent.click(row)
     expect(await screen.findByText(/# learnings/)).toBeInTheDocument()
   })

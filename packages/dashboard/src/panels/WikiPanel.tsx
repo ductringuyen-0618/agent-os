@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiClient, ApiError } from '../api/client'
 import { ErrorState } from '../components/ErrorState'
-import { Spinner } from '../components/Spinner'
+import { SkeletonRows } from '../components/Skeleton'
 import { WikiPage } from '../components/WikiPage'
 
 const client = new ApiClient()
@@ -34,36 +34,55 @@ export function WikiPanel() {
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-medium">Wiki</h2>
-      <div className="mb-4 flex gap-2 text-sm">
-        <button
-          type="button"
-          onClick={() => {
-            setTab('browse')
-            setPath(null)
-          }}
-          className={tab === 'browse' ? 'text-accent' : 'text-muted'}
-        >
-          Index
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('log')}
-          className={tab === 'log' ? 'text-accent' : 'text-muted'}
-        >
-          Log
-        </button>
+      <div className="mb-4 flex items-end justify-between border-b border-border">
+        <h2 className="pb-1.5 text-lg font-medium">Wiki</h2>
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              setTab('browse')
+              setPath(null)
+            }}
+            className={`tab ${tab === 'browse' ? 'tab-active' : ''}`}
+          >
+            Index
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('log')}
+            className={`tab ${tab === 'log' ? 'tab-active' : ''}`}
+          >
+            Log
+          </button>
+        </div>
       </div>
+      {tab === 'browse' && path && (
+        <div className="mb-3 flex items-center gap-2 font-mono text-xs text-muted">
+          <button
+            type="button"
+            onClick={() => setPath(null)}
+            className="hover:text-text hover:underline"
+          >
+            index
+          </button>
+          <span>/</span>
+          <span className="text-text">{path}</span>
+        </div>
+      )}
       {error && <ErrorState message={error} onRetry={() => load(tab, path)} />}
-      {!error && content === null && <Spinner label="Loading wiki…" />}
+      {!error && content === null && (
+        <SkeletonRows rows={6} label="Loading wiki…" />
+      )}
       {!error && content !== null && (
-        <WikiPage
-          content={content}
-          onNavigate={(p) => {
-            setTab('browse')
-            setPath(p)
-          }}
-        />
+        <div className="card max-w-3xl px-6 py-4">
+          <WikiPage
+            content={content}
+            onNavigate={(p) => {
+              setTab('browse')
+              setPath(p)
+            }}
+          />
+        </div>
       )}
     </section>
   )
