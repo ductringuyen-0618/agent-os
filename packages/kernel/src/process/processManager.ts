@@ -126,7 +126,31 @@ export class ProcessManager {
     const result = await child
     this.children.delete(run.id)
 
-    if (result.killed) {
+    if (buffer) {
+      const msg = parseStreamLine(buffer)
+      if (msg) {
+        this.log.append({
+          type: 'run.stream',
+          runId: run.id,
+          payload: msg as unknown as Record<string, unknown>,
+        })
+        if (msg.type === 'system' && msg.subtype === 'init')
+          sessionId = msg.session_id
+        if (msg.type === 'result') {
+          sessionId = msg.session_id
+          costUsd = msg.total_cost_usd
+          inputTokens = msg.usage?.input_tokens
+          outputTokens = msg.usage?.output_tokens
+          resultText = msg.result
+          isError = Boolean(msg.is_error) || msg.subtype !== 'success'
+        }
+      }
+    }
+
+    // execa v9's Result has no `killed` field; `isTerminated` (set on both a
+    // timeout and an explicit `child.kill()`) is the correct signal that the
+    // subprocess was terminated by a signal rather than exiting normally.
+    if (result.isTerminated) {
       this.log.append({ type: 'run.killed', runId: run.id, payload: {} })
       this.log.updateRun(run.id, {
         status: 'killed',

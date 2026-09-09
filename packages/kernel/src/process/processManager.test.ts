@@ -141,7 +141,72 @@ describe('ProcessManager', () => {
       mcpConfigPath: path.join(tmpDir, 'mcp.json'),
       timeoutMs: 10_000,
     })
+    expect(pm.running()).toEqual([run.id])
     await promise
     expect(pm.running()).toEqual([])
+  })
+
+  it('kill() terminates the subprocess and marks the run killed', async () => {
+    const cfg = loadKernelConfig(path.join(tmpDir, 'os'), {
+      claudeBin: fakeClaudeBin,
+      dbPath: path.join(tmpDir, 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    const run = log.createRun({ routine: 'heartbeat' })
+    // 5 lines * 10ms/line gives a wide enough window to kill mid-flight.
+    process.env.FAKE_CLAUDE_FIXTURE = path.join(
+      fixturesDir,
+      'tool-call-then-success.jsonl',
+    )
+
+    const promise = pm.start(run, {
+      prompt: 'x',
+      systemPromptAppend: '',
+      cwd: tmpDir,
+      model: 'haiku',
+      permissionMode: 'plan',
+      allowedTools: [],
+      addDirs: [],
+      mcpConfigPath: path.join(tmpDir, 'mcp.json'),
+      timeoutMs: 10_000,
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 15))
+    expect(pm.kill(run.id)).toBe(true)
+
+    const result = await promise
+    expect(result.status).toBe('killed')
+    expect(log.getRun(run.id)?.status).toBe('killed')
+    expect(
+      log.listEvents({ runId: run.id }).some((e) => e.type === 'run.killed'),
+    ).toBe(true)
+  })
+
+  it('marks a timed-out run as killed, not failed', async () => {
+    const cfg = loadKernelConfig(path.join(tmpDir, 'os'), {
+      claudeBin: fakeClaudeBin,
+      dbPath: path.join(tmpDir, 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    const run = log.createRun({ routine: 'heartbeat' })
+    process.env.FAKE_CLAUDE_FIXTURE = path.join(
+      fixturesDir,
+      'tool-call-then-success.jsonl',
+    )
+
+    const result = await pm.start(run, {
+      prompt: 'x',
+      systemPromptAppend: '',
+      cwd: tmpDir,
+      model: 'haiku',
+      permissionMode: 'plan',
+      allowedTools: [],
+      addDirs: [],
+      mcpConfigPath: path.join(tmpDir, 'mcp.json'),
+      timeoutMs: 15, // shorter than the fixture's ~50ms total replay time
+    })
+
+    expect(result.status).toBe('killed')
+    expect(log.getRun(run.id)?.status).toBe('killed')
   })
 })
