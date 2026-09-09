@@ -4,5 +4,5 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
       <div className="font-medium text-text">{title}</div>
       <div className="text-sm text-muted">{body}</div>
     </div>
-  );
+  )
 }

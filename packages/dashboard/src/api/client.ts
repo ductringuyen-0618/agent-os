@@ -7,50 +7,50 @@ import type {
   Run,
   RunStatus,
   SkillMeta,
-} from "@agentos/shared";
+} from '@agentos/shared'
 
 export class ApiError extends Error {
-  status: number;
-  body?: unknown;
+  status: number
+  body?: unknown
   constructor(status: number, message: string, body?: unknown) {
-    super(message);
-    this.status = status;
-    this.body = body;
+    super(message)
+    this.status = status
+    this.body = body
   }
 }
 
 export interface AgentStatus {
-  name: string;
-  status: "idle" | "working" | "blocked";
-  currentRun?: string;
+  name: string
+  status: 'idle' | 'working' | 'blocked'
+  currentRun?: string
 }
 export interface RoutineListItem {
-  routine: RoutineConfig;
-  nextRun?: string;
-  lastRun?: Run;
+  routine: RoutineConfig
+  nextRun?: string
+  lastRun?: Run
 }
 export interface CostEntry {
-  day: string;
-  agent: string;
-  costUsd: number;
+  day: string
+  agent: string
+  costUsd: number
 }
 export interface SkillDetail {
-  skillMd: string;
-  learningsMd: string;
-  eval: EvalCriteria;
-  lastOutputMd: string;
+  skillMd: string
+  learningsMd: string
+  eval: EvalCriteria
+  lastOutputMd: string
 }
 
 function authHeaders(): Record<string, string> {
   const token =
-    typeof localStorage !== "undefined"
-      ? localStorage.getItem("agentosToken")
-      : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('agentosToken')
+      : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export class ApiClient {
-  constructor(private baseUrl = "") {}
+  constructor(private baseUrl = '') {}
 
   private async req<T>(
     method: string,
@@ -59,97 +59,97 @@ export class ApiClient {
   ): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
-      headers: { "content-type": "application/json", ...authHeaders() },
+      headers: { 'content-type': 'application/json', ...authHeaders() },
       body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : undefined;
+    })
+    const text = await res.text()
+    const data = text ? JSON.parse(text) : undefined
     if (!res.ok)
-      throw new ApiError(res.status, data?.error || res.statusText, data);
-    return data as T;
+      throw new ApiError(res.status, data?.error || res.statusText, data)
+    return data as T
   }
 
   health() {
-    return this.req<{ ok: true; version: string }>("GET", "/api/health");
+    return this.req<{ ok: true; version: string }>('GET', '/api/health')
   }
 
   listRuns(
     opts: { status?: RunStatus; routine?: string; limit?: number } = {},
   ) {
-    const qs = new URLSearchParams(opts as Record<string, string>).toString();
-    return this.req<Run[]>("GET", `/api/runs${qs ? `?${qs}` : ""}`);
+    const qs = new URLSearchParams(opts as Record<string, string>).toString()
+    return this.req<Run[]>('GET', `/api/runs${qs ? `?${qs}` : ''}`)
   }
   getRun(id: string) {
-    return this.req<Run>("GET", `/api/runs/${id}`);
+    return this.req<Run>('GET', `/api/runs/${id}`)
   }
   getRunEvents(id: string, sinceId?: number) {
     return this.req<Event[]>(
-      "GET",
-      `/api/runs/${id}/events${sinceId ? `?sinceId=${sinceId}` : ""}`,
-    );
+      'GET',
+      `/api/runs/${id}/events${sinceId ? `?sinceId=${sinceId}` : ''}`,
+    )
   }
   killRun(id: string) {
-    return this.req<{ ok: true }>("POST", `/api/runs/${id}/kill`);
+    return this.req<{ ok: true }>('POST', `/api/runs/${id}/kill`)
   }
 
   listDecisions(status?: DecisionStatus) {
     return this.req<Decision[]>(
-      "GET",
-      `/api/decisions${status ? `?status=${status}` : ""}`,
-    );
+      'GET',
+      `/api/decisions${status ? `?status=${status}` : ''}`,
+    )
   }
   approveDecision(id: string) {
-    return this.req<Decision>("POST", `/api/decisions/${id}/approve`);
+    return this.req<Decision>('POST', `/api/decisions/${id}/approve`)
   }
   rejectDecision(id: string) {
-    return this.req<Decision>("POST", `/api/decisions/${id}/reject`);
+    return this.req<Decision>('POST', `/api/decisions/${id}/reject`)
   }
 
   listRoutines() {
-    return this.req<RoutineListItem[]>("GET", "/api/routines");
+    return this.req<RoutineListItem[]>('GET', '/api/routines')
   }
   runRoutine(name: string, payload?: Record<string, unknown>) {
-    return this.req<{ runId: string }>("POST", `/api/routines/${name}/run`, {
+    return this.req<{ runId: string }>('POST', `/api/routines/${name}/run`, {
       payload,
-    });
+    })
   }
   enableRoutine(name: string) {
-    return this.req<{ ok: true }>("POST", `/api/routines/${name}/enable`);
+    return this.req<{ ok: true }>('POST', `/api/routines/${name}/enable`)
   }
   disableRoutine(name: string) {
-    return this.req<{ ok: true }>("POST", `/api/routines/${name}/disable`);
+    return this.req<{ ok: true }>('POST', `/api/routines/${name}/disable`)
   }
 
   wikiIndex() {
-    return this.req<{ content: string }>("GET", "/api/wiki/index");
+    return this.req<{ content: string }>('GET', '/api/wiki/index')
   }
   wikiLog(limit?: number) {
     return this.req<{ content: string }>(
-      "GET",
-      `/api/wiki/log${limit ? `?limit=${limit}` : ""}`,
-    );
+      'GET',
+      `/api/wiki/log${limit ? `?limit=${limit}` : ''}`,
+    )
   }
   wikiPage(path: string) {
     return this.req<{ content: string }>(
-      "GET",
+      'GET',
       `/api/wiki/page?path=${encodeURIComponent(path)}`,
-    );
+    )
   }
 
   listSkills() {
-    return this.req<SkillMeta[]>("GET", "/api/skills");
+    return this.req<SkillMeta[]>('GET', '/api/skills')
   }
   getSkill(name: string) {
-    return this.req<SkillDetail>("GET", `/api/skills/${name}`);
+    return this.req<SkillDetail>('GET', `/api/skills/${name}`)
   }
 
   listAgents() {
-    return this.req<AgentStatus[]>("GET", "/api/agents");
+    return this.req<AgentStatus[]>('GET', '/api/agents')
   }
   costs(days?: number) {
     return this.req<CostEntry[]>(
-      "GET",
-      `/api/costs${days ? `?days=${days}` : ""}`,
-    );
+      'GET',
+      `/api/costs${days ? `?days=${days}` : ''}`,
+    )
   }
 }

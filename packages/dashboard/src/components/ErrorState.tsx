@@ -15,5 +15,5 @@ export function ErrorState({
         </button>
       )}
     </div>
-  );
+  )
 }
