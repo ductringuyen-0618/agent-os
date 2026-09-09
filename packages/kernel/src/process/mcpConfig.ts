@@ -14,6 +14,13 @@ export async function writeRunMcpConfig(
   const binPath = path.resolve(import.meta.dirname, '..', 'syscall', 'bin.js')
   const mcpConfig = {
     mcpServers: {
+      // `agentos` is spread last so a routine's extra_mcp can never shadow
+      // the daemon's own syscall server (e.g. an extra_mcp entry literally
+      // named "agentos" replacing it, silently swapping out the run's
+      // AGENTOS_RUN_TOKEN/DAEMON_URL for an attacker- or
+      // misconfiguration-controlled command) — nothing in RoutineConfigSchema
+      // stops a routines.yaml author from naming an extra_mcp key "agentos".
+      ...(extra ?? {}),
       agentos: {
         command: process.execPath,
         args: [binPath],
@@ -23,7 +30,6 @@ export async function writeRunMcpConfig(
           AGENTOS_RUN_TOKEN: runToken,
         },
       },
-      ...(extra ?? {}),
     },
   }
   const configPath = path.join(runDir, 'mcp.json')

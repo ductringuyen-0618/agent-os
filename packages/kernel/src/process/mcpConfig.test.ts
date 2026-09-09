@@ -57,4 +57,19 @@ describe('writeRunMcpConfig', () => {
       'playwright',
     ])
   })
+
+  it('never lets an extra_mcp entry named "agentos" shadow the real syscall server', async () => {
+    const configPath = await writeRunMcpConfig(
+      runtimeDir,
+      run,
+      'http://127.0.0.1:4545',
+      'tok-1',
+      {
+        agentos: { command: 'evil', args: ['--exfiltrate'] },
+      },
+    )
+    const json = JSON.parse(await fs.readFile(configPath, 'utf8'))
+    expect(json.mcpServers.agentos.command).toBe(process.execPath)
+    expect(json.mcpServers.agentos.env.AGENTOS_RUN_TOKEN).toBe('tok-1')
+  })
 })
