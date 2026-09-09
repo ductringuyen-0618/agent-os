@@ -8,6 +8,7 @@ import {
 import type { FastifyInstance } from 'fastify'
 import { nanoid } from 'nanoid'
 import { AdapterHost } from './adapters/adapterHost.js'
+import type { ProjectAdapter } from './adapters/types.js'
 import { buildServer } from './api/server.js'
 import type { KernelConfig } from './config.js'
 import { EventLog } from './log/eventLog.js'
@@ -42,11 +43,14 @@ class KernelImpl implements Kernel {
   private server: FastifyInstance | undefined
   private routinesFile: RoutinesFile | undefined
 
-  constructor(public cfg: KernelConfig) {
+  constructor(
+    public cfg: KernelConfig,
+    registry: Record<string, ProjectAdapter> = {},
+  ) {
     this.log = new EventLog(cfg.dbPath)
     this.pm = new ProcessManager(cfg, this.log)
     this.wiki = new WikiService(cfg.osRoot, this.log)
-    this.adapters = new AdapterHost(cfg, this.log, this.wiki, {})
+    this.adapters = new AdapterHost(cfg, this.log, this.wiki, registry)
     this.scheduler = new Scheduler(cfg, this.log, (routine, payload) =>
       this.exec(routine, payload),
     )
@@ -170,6 +174,9 @@ class KernelImpl implements Kernel {
   }
 }
 
-export function createKernel(cfg: KernelConfig): Kernel {
-  return new KernelImpl(cfg)
+export function createKernel(
+  cfg: KernelConfig,
+  registry: Record<string, ProjectAdapter> = {},
+): Kernel {
+  return new KernelImpl(cfg, registry)
 }

@@ -57,9 +57,14 @@ export class ApiClient {
     path: string,
     body?: unknown,
   ): Promise<T> {
+    // Only declare a JSON body when there is one: Fastify rejects
+    // `content-type: application/json` with an empty body as 400.
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
-      headers: { 'content-type': 'application/json', ...authHeaders() },
+      headers: {
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...authHeaders(),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
     const text = await res.text()

@@ -41,10 +41,12 @@ export interface RunResult {
 }
 
 function buildArgs(spec: SpawnSpec): string[] {
+  // `claude -p` refuses stream-json output without --verbose.
   const args: string[] = [
     '-p',
     '--output-format',
     'stream-json',
+    '--verbose',
     '--include-partial-messages',
   ]
   if (spec.systemPromptAppend)
@@ -108,6 +110,12 @@ export class ProcessManager {
     let outputTokens: number | undefined
     let resultText: string | undefined
     let isError = false
+
+    let stderrTail = ''
+    child.stderr?.setEncoding('utf8')
+    child.stderr?.on('data', (chunk: string) => {
+      stderrTail = (stderrTail + chunk).slice(-2000)
+    })
 
     child.stdout?.setEncoding('utf8')
     let buffer = ''
@@ -175,9 +183,11 @@ export class ProcessManager {
 
     const status: RunResult['status'] =
       result.exitCode === 0 && !isError ? 'success' : 'failed'
+    const stderrNote = stderrTail.trim()
     const error =
       status === 'failed'
-        ? (resultText ?? `exit code ${result.exitCode}`)
+        ? (resultText ??
+          `exit code ${result.exitCode}${stderrNote ? `: ${stderrNote}` : ''}`)
         : undefined
 
     this.log.updateRun(run.id, {

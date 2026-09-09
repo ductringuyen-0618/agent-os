@@ -54,6 +54,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@agentos/adapters':
+        specifier: workspace:*
+        version: link:../adapters
       '@agentos/kernel':
         specifier: workspace:*
         version: link:../kernel
