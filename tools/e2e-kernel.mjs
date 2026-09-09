@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createKernel, loadKernelConfig } from '@agentos/kernel'
 import { seedDecision } from './seed-decision.mjs'
+import { seedWorkflow } from './seed-workflow.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const osRoot = path.resolve(here, '../examples/os-template/os')
@@ -19,3 +20,4 @@ const cfg = loadKernelConfig(osRoot, {
 const kernel = createKernel(cfg)
 await kernel.start()
 seedDecision(cfg.dbPath)
+seedWorkflow(cfg.dbPath)
