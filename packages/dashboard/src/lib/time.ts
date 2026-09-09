@@ -8,7 +8,8 @@ export function relativeTime(iso: string | undefined, now = Date.now()) {
   const t = Date.parse(iso)
   if (Number.isNaN(t)) return iso
   const diff = now - t
-  if (diff < 0) return 'in a moment'
+  // A few seconds of skew between the daemon clock and this page is normal.
+  if (diff < -MIN) return 'in a moment'
   if (diff < 45_000) return 'just now'
   if (diff < HOUR) return `${Math.round(diff / MIN)} min ago`
   if (diff < DAY) return `${Math.round(diff / HOUR)} h ago`

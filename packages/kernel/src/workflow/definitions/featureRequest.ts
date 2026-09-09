@@ -80,7 +80,9 @@ function briefSpec(
   return {
     skill: 'feature-brief',
     agent: 'ops',
-    permissionMode: 'plan',
+    // `default`, not `plan`: claude -p refuses every MCP call in plan mode,
+    // and this step's only tools are the agentos syscalls listed below.
+    permissionMode: 'default',
     allowedTools: [
       'mcp__agentos__get_context',
       'mcp__agentos__read_wiki',
@@ -283,7 +285,7 @@ export function createFeatureRequestWorkflow(
             project,
             'feature-review',
             { branch, proposalMarkdown: proposalBody },
-            'plan',
+            'default',
             ['Read', 'Glob', 'Grep'],
           ),
         )
@@ -326,7 +328,7 @@ export function createFeatureRequestWorkflow(
             project,
             'feature-review',
             { branch, proposalMarkdown: proposalBody },
-            'plan',
+            'default',
             ['Read', 'Glob', 'Grep'],
           ),
         )

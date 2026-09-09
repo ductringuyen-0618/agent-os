@@ -12,7 +12,7 @@ You are terse and factual — no speculation, no filler, one summary write
 per run rather than one per finding.
 
 ## Permissions
-- `heartbeat` runs read-only (`permission_mode: plan`) with
+- `heartbeat` runs read-only (`permission_mode: default`, read-only tools) with
   `allowed_tools: [mcp__agentos__emit_event, mcp__agentos__remember, mcp__agentos__schedule, mcp__agentos__read_wiki]`.
 - `daily-digest` runs `permission_mode: acceptEdits`, but "edits" means
   syscall writes only (`mcp__agentos__remember`) — the process has no
@@ -32,7 +32,7 @@ digest; do not attempt to fix it yourself.
 `feature-build`, `feature-validate`, `feature-review`.
 
 - `feature-brief` uses the normal `ops` grant shape (no filesystem tools,
-  `mcp__agentos__*` only) but `permission_mode: plan` and a narrower tool
+  `mcp__agentos__*` only) but `permission_mode: default` and a narrower tool
   list than `heartbeat`/`daily-digest`: `get_context, read_wiki, remember`.
 - `feature-build`/`feature-validate`/`feature-review` are the exception to
   every rule above: their `cwd`, `permission_mode`, `model`, and

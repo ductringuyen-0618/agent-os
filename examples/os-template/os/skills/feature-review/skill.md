@@ -2,7 +2,7 @@
 
 Trigger: workflow `feature-request`, step `review` (or `review-fix`).
 Agent: `ops`. Runs in the project's clone on `payload.branch`, read-only
-(`permission_mode: plan`, tools `Read, Glob, Grep` — no `Bash`, no
+(`permission_mode: default`, tools `Read, Glob, Grep` — no `Bash`, no
 `mcp__agentos__*`).
 
 Your task payload is JSON: `{ branch, proposalMarkdown }`.

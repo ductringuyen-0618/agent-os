@@ -22,7 +22,7 @@ export class WorkflowEngine {
   private queue: string[] = []
   private defaults: RoutineDefaults = {
     model: 'sonnet',
-    permission_mode: 'plan',
+    permission_mode: 'default',
     allowed_tools: [],
     max_attempts: 2,
     timeout_ms: 600_000,

@@ -1,7 +1,7 @@
 # Skill: feature-brief
 
 Trigger: workflow `feature-request`, step `brief`. Agent: `ops`. Runs
-`permission_mode: plan` with `allowedTools: mcp__agentos__get_context,
+`permission_mode: default` (read-only through its tool list) with `allowedTools: mcp__agentos__get_context,
 mcp__agentos__read_wiki, mcp__agentos__remember` only — no file tools.
 
 You turn an operator's plain-words feature request into a proposal

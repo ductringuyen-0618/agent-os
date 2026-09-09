@@ -1,6 +1,8 @@
 defaults:
   model: sonnet
-  permission_mode: plan
+  # `default` with a narrow allowed_tools list is the read-only mode. `plan`
+  # would refuse the mcp__agentos__* syscalls every skill depends on.
+  permission_mode: default
   allowed_tools:
     - Read
     - Glob

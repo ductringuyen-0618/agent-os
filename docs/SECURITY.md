@@ -16,8 +16,10 @@ and any private instance built from it.
   anything outside its own workspace.
 - Write files, but **only** inside its own `agents/<name>/workspace/`
   directory, and only when the routine's `permission_mode` allows edits
-  (`acceptEdits`, `default`, or `bypassPermissions` — most routines run
-  `plan`, which is read-only).
+  (`acceptEdits` or `bypassPermissions`). Most routines run `default`
+  with an `allowed_tools` list that contains no file-writing tool, which
+  is what makes them read-only; `plan` mode is not used because `claude -p`
+  refuses every MCP call in it, including the kernel's own syscalls.
 
 ## What an agent cannot do
 - It cannot edit or delete anything under `raw/` — the `remember` syscall

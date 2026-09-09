@@ -9,7 +9,8 @@ describe('relativeTime', () => {
     expect(relativeTime('2026-09-09T11:57:00Z', NOW)).toBe('3 min ago')
     expect(relativeTime('2026-09-09T09:00:00Z', NOW)).toBe('3 h ago')
     expect(relativeTime('2026-09-08T10:00:00Z', NOW)).toBe('yesterday')
-    expect(relativeTime('2026-09-09T12:00:30Z', NOW)).toBe('in a moment')
+    expect(relativeTime('2026-09-09T12:00:30Z', NOW)).toBe('just now')
+    expect(relativeTime('2026-09-09T12:05:00Z', NOW)).toBe('in a moment')
   })
   it('handles missing or unparseable input', () => {
     expect(relativeTime(undefined, NOW)).toBe('—')
