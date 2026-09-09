@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
 import { ApiClient } from './client.js'
+import { registerApprove } from './commands/approve.js'
+import { registerDecisions } from './commands/decisions.js'
 import { logs } from './commands/logs.js'
 import { ps } from './commands/ps.js'
+import { registerReject } from './commands/reject.js'
 import { registerRoutinesCommand } from './commands/routines.js'
 import { run as runCommand } from './commands/run.js'
+import { registerSync } from './commands/sync.js'
 import { up } from './commands/up.js'
 
 const program = new Command()
@@ -54,5 +58,9 @@ program
   })
 
 registerRoutinesCommand(program, client())
+registerDecisions(program, client())
+registerApprove(program, client())
+registerReject(program, client())
+registerSync(program, client())
 
 program.parseAsync(process.argv)
