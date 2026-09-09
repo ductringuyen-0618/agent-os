@@ -1,17 +1,43 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   writeFileSync,
+  writeFileSync as writeFileSyncFs,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { AdapterContext } from '@agentos/kernel/adapters/types'
 import simpleGit from 'simple-git'
-import { describe, expect, it } from 'vitest'
-import { bootstrapCooLayout, pushProposal } from './requests.js'
+import { afterEach, describe, expect, it } from 'vitest'
+import {
+  bootstrapCooLayout,
+  markShipped,
+  openPullRequest,
+  pushProposal,
+  writeReport,
+} from './requests.js'
 import { createTempTechpulseRepo } from './test-helpers.js'
+
+function writeFakeGh(root: string): string {
+  const scriptPath = path.join(root, 'fake-gh.js')
+  writeFileSyncFs(
+    scriptPath,
+    `#!/usr/bin/env node
+const args = process.argv.slice(2)
+if (args[0] === 'pr' && args[1] === 'create') {
+  console.log('https://github.com/owner/sandbox/pull/42')
+  process.exit(0)
+}
+process.exit(1)
+`,
+    'utf8',
+  )
+  chmodSync(scriptPath, 0o755)
+  return scriptPath
+}
 
 function fakeCtx(clone: string) {
   // biome-ignore lint/suspicious/noExplicitAny: test event capture
@@ -159,5 +185,113 @@ describe('pushProposal', () => {
       'utf8',
     )
     expect(pushed).toContain('status: proposed')
+  })
+})
+
+describe('openPullRequest', () => {
+  const originalGhBin = process.env.AGENTOS_GH_BIN
+  afterEach(() => {
+    if (originalGhBin === undefined) {
+      // biome-ignore lint/performance/noDelete: assigning undefined would stringify to "undefined"
+      delete process.env.AGENTOS_GH_BIN
+    } else {
+      process.env.AGENTOS_GH_BIN = originalGhBin
+    }
+  })
+
+  it('pushes the branch and returns the PR url/number from gh', async () => {
+    const { bareDir, cloneDir } = await createTempTechpulseRepo()
+    const { ctx } = fakeCtx(cloneDir)
+    process.env.AGENTOS_GH_BIN = writeFakeGh(
+      mkdtempSync(path.join(tmpdir(), 'agentos-gh-')),
+    )
+
+    const git = simpleGit(cloneDir)
+    await git.checkoutLocalBranch('req/faster-search')
+    writeFileSync(path.join(cloneDir, 'CHANGED.md'), 'change\n')
+    await git.add('CHANGED.md')
+    await git.commit('feat: faster search')
+
+    const result = await openPullRequest(ctx, {
+      branch: 'req/faster-search',
+      slug: 'faster-search',
+      title: 'Make search faster',
+      proposalFile: 'docs/missions/coo/proposals/001-dark-mode.md',
+      proposalWhatWhy: '## What you get\nFaster search.',
+      validationOutput: 'PASS\nall checks green',
+      reviewOutput: 'PASS\nlooks good',
+    })
+
+    expect(result).toEqual({
+      url: 'https://github.com/owner/sandbox/pull/42',
+      number: 42,
+    })
+
+    const verifyDir = mkdtempSync(path.join(tmpdir(), 'agentos-verify-'))
+    await simpleGit().clone(bareDir, verifyDir)
+    const branches = await simpleGit(verifyDir).branch(['-r'])
+    expect(branches.all).toContain('origin/req/faster-search')
+  })
+
+  it('refuses to open a PR when the body contains a secret', async () => {
+    const { cloneDir } = await createTempTechpulseRepo()
+    const { ctx } = fakeCtx(cloneDir)
+    process.env.AGENTOS_GH_BIN = writeFakeGh(
+      mkdtempSync(path.join(tmpdir(), 'agentos-gh-')),
+    )
+    const git = simpleGit(cloneDir)
+    await git.checkoutLocalBranch('req/leaky')
+    writeFileSync(path.join(cloneDir, 'CHANGED.md'), 'change\n')
+    await git.add('CHANGED.md')
+    await git.commit('feat: leaky')
+
+    await expect(
+      openPullRequest(ctx, {
+        branch: 'req/leaky',
+        slug: 'leaky',
+        title: 'Leaky',
+        proposalFile: 'docs/missions/coo/proposals/001-dark-mode.md',
+        proposalWhatWhy: 'fine',
+        validationOutput: 'key = AKIAABCDEFGHIJKLMNOP',
+        reviewOutput: 'PASS',
+      }),
+    ).rejects.toThrow(/Secret/)
+  })
+})
+
+describe('markShipped / writeReport', () => {
+  it('flips status to shipped and writes a report, each its own commit on base_branch', async () => {
+    const { bareDir, cloneDir } = await createTempTechpulseRepo()
+    const { ctx } = fakeCtx(cloneDir)
+
+    const shipResult = await markShipped(
+      ctx,
+      'dark-mode',
+      'docs/missions/coo/proposals/001-dark-mode.md',
+    )
+    expect(shipResult.sha).toBeTruthy()
+
+    const reportResult = await writeReport(ctx, {
+      slug: 'dark-mode',
+      branch: 'req/dark-mode',
+      prUrl: 'https://github.com/owner/sandbox/pull/42',
+      validationOutput: 'PASS\nall green',
+      reviewOutput: 'PASS\nlooks good',
+    })
+    expect(reportResult.file).toBe('docs/missions/coo/reports/dark-mode.md')
+
+    const verifyDir = mkdtempSync(path.join(tmpdir(), 'agentos-verify-'))
+    await simpleGit().clone(bareDir, verifyDir)
+    const proposal = readFileSync(
+      path.join(verifyDir, 'docs/missions/coo/proposals/001-dark-mode.md'),
+      'utf8',
+    )
+    expect(proposal).toContain('status: shipped')
+    const report = readFileSync(
+      path.join(verifyDir, 'docs/missions/coo/reports/dark-mode.md'),
+      'utf8',
+    )
+    expect(report).toContain('https://github.com/owner/sandbox/pull/42')
+    expect(report).toContain('all green')
   })
 })

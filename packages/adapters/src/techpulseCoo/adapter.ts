@@ -9,6 +9,13 @@ import type {
 import type { Decision } from '@agentos/shared'
 import simpleGit from 'simple-git'
 import { readStatus, setStatus } from './frontmatter.js'
+import {
+  bootstrapCooLayout,
+  markShipped,
+  openPullRequest,
+  pushProposal,
+  writeReport,
+} from './requests.js'
 
 interface TechpulseCooOptions {
   proposals_path: string
@@ -289,6 +296,13 @@ export const techpulseCooAdapter: ProjectAdapter = {
       })
       throw err
     }
+  },
+  featureRequests: {
+    bootstrapLayout: bootstrapCooLayout,
+    pushProposal,
+    openPullRequest,
+    markShipped,
+    writeReport,
   },
 }
 

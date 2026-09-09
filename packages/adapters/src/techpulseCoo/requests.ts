@@ -1,13 +1,22 @@
-import { access, mkdir, readdir, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type {
   AdapterContext,
+  FeatureRequestOpenPrInput,
+  FeatureRequestOpenPrResult,
   FeatureRequestPushProposalInput,
   FeatureRequestPushProposalResult,
+  FeatureRequestWriteReportInput,
+  FeatureRequestWriteReportResult,
 } from '@agentos/kernel/adapters/types'
+import { SecretDetectedError, findSecrets } from '@agentos/kernel/wiki/redact'
+import { execa } from 'execa'
 import matter from 'gray-matter'
 import simpleGit from 'simple-git'
 import { ensureClone } from './adapter.js'
+import { setStatus } from './frontmatter.js'
 
 interface TechpulseCooOptions {
   proposals_path: string
@@ -133,4 +142,158 @@ export async function pushProposal(
     sha: commitResult.commit,
     bootstrapped: bootstrap.created.length > 0,
   }
+}
+
+function ghInvoke(args: string[]) {
+  const bin = process.env.AGENTOS_GH_BIN ?? 'gh'
+  // Mirrors ProcessManager's resolveCommand: a fake gh shipped as a plain
+  // .js test double has no OS-level executable bit on every platform, so
+  // run it through the current Node binary instead of exec'ing it directly.
+  if (bin.endsWith('.js')) return execa(process.execPath, [bin, ...args])
+  return execa(bin, args)
+}
+
+function buildPrBody(input: FeatureRequestOpenPrInput): string {
+  return [
+    '## What you get / Why start this now',
+    input.proposalWhatWhy.trim(),
+    '',
+    '## Validation',
+    input.validationOutput.trim() || '(no validation output recorded)',
+    '',
+    '## Review',
+    input.reviewOutput.trim() || '(no review output recorded)',
+    '',
+    '---',
+    `Proposal: ${input.proposalFile}`,
+    '',
+    'Co-Authored-By: Claude via agent-os <noreply@anthropic.com>',
+  ].join('\n')
+}
+
+/**
+ * Pushes the agent-built branch, then opens a PR via `gh pr create` (spec
+ * §5.2 step 7). The PR body is scanned with findSecrets before gh ever
+ * runs (spec §5.3) -- a hit throws and gh is never invoked.
+ */
+export async function openPullRequest(
+  ctx: AdapterContext,
+  input: FeatureRequestOpenPrInput,
+): Promise<FeatureRequestOpenPrResult> {
+  const body = buildPrBody(input)
+  const secrets = findSecrets(body)
+  if (secrets.length > 0) throw new SecretDetectedError(secrets)
+
+  const git = simpleGit(ctx.project.clone)
+  await git.push('origin', input.branch)
+  ctx.log.append({
+    type: 'git.push',
+    runId: ctx.runId,
+    payload: { slug: input.slug, branch: input.branch },
+  })
+
+  const bodyDir = await mkdtemp(path.join(tmpdir(), 'agentos-pr-'))
+  const bodyFile = path.join(bodyDir, 'body.md')
+  await writeFile(bodyFile, body, 'utf8')
+  try {
+    const result = await ghInvoke([
+      'pr',
+      'create',
+      '--repo',
+      ctx.project.repo,
+      '--base',
+      ctx.project.base_branch,
+      '--head',
+      input.branch,
+      '--title',
+      `feat: ${input.title}`,
+      '--body-file',
+      bodyFile,
+    ])
+    const url = result.stdout.trim().split('\n').pop() ?? ''
+    const match = /\/pull\/(\d+)/.exec(url)
+    return { url, number: match ? Number(match[1]) : 0 }
+  } finally {
+    await rm(bodyDir, { recursive: true, force: true })
+  }
+}
+
+/** Flips the proposal's frontmatter status to shipped on base_branch (spec §5.2 step 7). */
+export async function markShipped(
+  ctx: AdapterContext,
+  slug: string,
+  proposalFile: string,
+): Promise<{ sha: string }> {
+  const git = simpleGit(ctx.project.clone)
+  await git.checkout(ctx.project.base_branch)
+  await git.pull('origin', ctx.project.base_branch, ['--ff-only'])
+
+  const absPath = path.join(ctx.project.clone, proposalFile)
+  const content = await readFile(absPath, 'utf8')
+  await writeFile(absPath, setStatus(content, 'shipped'), 'utf8')
+
+  await git.add([posix(proposalFile)])
+  const subject = `chore(coo): ship ${slug}`
+  const commitResult = await git.commit(
+    `${subject}\n\nCo-Authored-By: Claude via agent-os <noreply@anthropic.com>`,
+  )
+  ctx.log.append({
+    type: 'git.commit',
+    runId: ctx.runId,
+    payload: { slug, sha: commitResult.commit, message: subject },
+  })
+  await git.push('origin', ctx.project.base_branch)
+  ctx.log.append({
+    type: 'git.push',
+    runId: ctx.runId,
+    payload: { slug, branch: ctx.project.base_branch },
+  })
+
+  return { sha: commitResult.commit }
+}
+
+/** Writes docs/missions/coo/reports/<slug>.md on base_branch (spec §5.2 step 7). */
+export async function writeReport(
+  ctx: AdapterContext,
+  input: FeatureRequestWriteReportInput,
+): Promise<FeatureRequestWriteReportResult> {
+  const o = opts(ctx)
+  const relPath = posix(path.join(o.reports_path, `${input.slug}.md`))
+  const absPath = path.join(ctx.project.clone, relPath)
+  const content = [
+    `# Report: ${input.slug}`,
+    '',
+    `- branch: ${input.branch}`,
+    `- pull request: ${input.prUrl}`,
+    `- shipped: ${new Date().toISOString()}`,
+    '',
+    '## Validation',
+    input.validationOutput.trim() || '(no validation output recorded)',
+    '',
+    '## Review',
+    input.reviewOutput.trim() || '(no review output recorded)',
+    '',
+  ].join('\n')
+  await mkdir(path.dirname(absPath), { recursive: true })
+  await writeFile(absPath, content, 'utf8')
+
+  const git = simpleGit(ctx.project.clone)
+  await git.add([relPath])
+  const subject = `docs(coo): report for ${input.slug}`
+  const commitResult = await git.commit(
+    `${subject}\n\nCo-Authored-By: Claude via agent-os <noreply@anthropic.com>`,
+  )
+  ctx.log.append({
+    type: 'git.commit',
+    runId: ctx.runId,
+    payload: { slug: input.slug, sha: commitResult.commit, message: subject },
+  })
+  await git.push('origin', ctx.project.base_branch)
+  ctx.log.append({
+    type: 'git.push',
+    runId: ctx.runId,
+    payload: { slug: input.slug, branch: ctx.project.base_branch },
+  })
+
+  return { file: relPath, sha: commitResult.commit }
 }
