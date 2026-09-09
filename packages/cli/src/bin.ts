@@ -11,6 +11,7 @@ import { registerRoutinesCommand } from './commands/routines.js'
 import { run as runCommand } from './commands/run.js'
 import { registerSync } from './commands/sync.js'
 import { up } from './commands/up.js'
+import { registerWorkflowsCommand } from './commands/workflows.js'
 
 const program = new Command()
 program.name('agentos').description('agent-os CLI').version('0.1.0')
@@ -70,6 +71,7 @@ program
   })
 
 registerRoutinesCommand(program, client())
+registerWorkflowsCommand(program, client())
 registerDecisions(program, client())
 registerApprove(program, client())
 registerReject(program, client())
