@@ -38,6 +38,9 @@ export interface RoutineListItem {
   routine: RoutineConfig
   nextRun?: string
   lastRun?: Run
+  dailyBudgetUsd?: number
+  spentTodayUsd?: number
+  budgetTripped?: boolean
 }
 export interface CostEntry {
   day: string

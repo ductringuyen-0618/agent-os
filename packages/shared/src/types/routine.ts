@@ -12,6 +12,7 @@ export interface RoutineDefaults {
   allowed_tools: string[]
   max_attempts: number
   timeout_ms: number
+  daily_budget_usd?: number
 }
 
 export interface RoutineConfig {
@@ -33,6 +34,7 @@ export interface RoutineConfig {
   >
   max_attempts?: number
   timeout_ms?: number
+  daily_budget_usd?: number
 }
 
 export interface WorkflowsConfig {

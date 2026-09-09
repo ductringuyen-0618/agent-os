@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ApiClient, ApiError, type CostEntry } from '../api/client'
+import {
+  ApiClient,
+  ApiError,
+  type CostEntry,
+  type RoutineListItem,
+} from '../api/client'
 import { CostChart } from '../components/CostChart'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
@@ -12,6 +17,7 @@ const DAYS = 14
 export function CostsPanel() {
   const [entries, setEntries] = useState<CostEntry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [routines, setRoutines] = useState<RoutineListItem[]>([])
 
   const load = useCallback(() => {
     setError(null)
@@ -21,11 +27,17 @@ export function CostsPanel() {
       .catch((e) =>
         setError(e instanceof ApiError ? e.message : 'Failed to load costs'),
       )
+    client
+      .listRoutines()
+      .then(setRoutines)
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
     load()
   }, [load])
+
+  const budgeted = routines.filter((r) => r.dailyBudgetUsd !== undefined)
 
   const total = entries?.reduce((s, e) => s + e.costUsd, 0) ?? 0
   const today = todayKey()
@@ -81,6 +93,29 @@ export function CostsPanel() {
           <div className="card p-4">
             <CostChart entries={entries} window={DAYS} />
           </div>
+          {budgeted.length > 0 && (
+            <div className="mt-3 card p-4">
+              <h3 className="mb-2 text-xs text-muted">Budgets</h3>
+              <ul className="space-y-1 text-sm">
+                {budgeted.map((r) => (
+                  <li
+                    key={r.routine.name}
+                    className="flex items-center justify-between font-mono"
+                  >
+                    <span>
+                      {r.routine.name}
+                      {r.budgetTripped && (
+                        <span className="chip ml-2">budget hit</span>
+                      )}
+                    </span>
+                    <span className="text-muted">
+                      {usd(r.spentTodayUsd)} / {usd(r.dailyBudgetUsd)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
     </section>

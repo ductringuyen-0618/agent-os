@@ -1,7 +1,7 @@
 ---
-status: approved
+status: shipped
 attempts: 0
-branch: null
+branch: coo/routine-cost-budgets
 ---
 # Per-routine daily cost budgets with a circuit breaker
 

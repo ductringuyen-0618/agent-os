@@ -11,6 +11,11 @@ defaults:
     - WebSearch
   max_attempts: 2
   timeout_ms: 600000
+  # daily_budget_usd: 2.0 -- global cap; a routine can override its own below.
+  # Once a routine's spend for the current UTC day meets its cap, the
+  # scheduler skips further fires (one ops.alert, no silent pause) until
+  # the cap resets at UTC midnight.
+
 routines:
   - name: heartbeat
     skill: heartbeat
@@ -22,6 +27,7 @@ routines:
       - mcp__agentos__remember
       - mcp__agentos__schedule
       - mcp__agentos__read_wiki
+    # daily_budget_usd: 1.0 -- overrides the global default for this routine.
   - name: techpulse-sync
     adapter: techpulse
     every: 1h
