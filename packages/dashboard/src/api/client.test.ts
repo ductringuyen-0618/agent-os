@@ -41,6 +41,47 @@ describe('ApiClient', () => {
     const detail = await client.getSkill('heartbeat')
     expect(detail.skillMd).toContain('# skill')
   })
+
+  it('lists, creates, and controls workflows', async () => {
+    const client = new ApiClient()
+    const workflows = await client.listWorkflows()
+    expect(workflows).toEqual([fixtures.workflow])
+    const detail = await client.getWorkflow('wf_1')
+    expect(detail.steps).toEqual(fixtures.workflowSteps)
+    const created = await client.createWorkflow({
+      kind: 'feature-request',
+      project: 'techpulse',
+      title: 'Add a widget',
+      input: {
+        project: 'techpulse',
+        title: 'Add a widget',
+        description: 'A short description.',
+        autoApprove: true,
+      },
+    })
+    expect(created.workflowId).toBe('wf_2')
+    expect(await client.pauseWorkflow('wf_1')).toMatchObject({
+      status: 'paused',
+    })
+    expect(await client.resumeWorkflow('wf_1')).toMatchObject({
+      status: 'running',
+    })
+    expect(await client.terminateWorkflow('wf_1')).toMatchObject({
+      status: 'terminated',
+    })
+    expect(
+      await client.sendWorkflowEvent('wf_1', {
+        type: 'decision.resolved',
+        payload: { status: 'approved' },
+      }),
+    ).toEqual({ id: 2 })
+  })
+
+  it('lists projects', async () => {
+    const client = new ApiClient()
+    const projects = await client.listProjects()
+    expect(projects).toEqual([fixtures.projectListItem])
+  })
 })
 
 describe('ApiClient — projects', () => {

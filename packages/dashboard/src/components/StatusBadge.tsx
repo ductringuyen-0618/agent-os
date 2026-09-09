@@ -12,6 +12,11 @@ const COLORS: Record<string, string> = {
   approved: 'text-success',
   rejected: 'text-danger',
   error: 'text-danger',
+  waiting: 'text-signal',
+  sleeping: 'text-muted',
+  paused: 'text-muted',
+  succeeded: 'text-success',
+  terminated: 'text-danger',
 }
 
 const LIVE = new Set(['working', 'running', 'wrapping_up'])

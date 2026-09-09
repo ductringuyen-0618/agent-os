@@ -48,4 +48,18 @@ describe('App', () => {
       await screen.findByRole('heading', { name: 'Projects' }),
     ).toBeInTheDocument()
   })
+
+  it('opens the Requests panel from the left nav', async () => {
+    installMockFetch()
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
+    render(<App />)
+    // Overview's own "Requests in flight" stat button also matches
+    // /Requests/, so this needs an exact match on the nav item's label.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Requests', exact: true }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Requests' }),
+    ).toBeInTheDocument()
+  })
 })

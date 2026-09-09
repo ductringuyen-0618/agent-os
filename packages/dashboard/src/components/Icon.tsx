@@ -8,6 +8,7 @@ export type IconName =
   | 'costs'
   | 'messages'
   | 'projects'
+  | 'requests'
   | 'close'
   | 'check'
   | 'x'
@@ -26,6 +27,7 @@ const PATHS: Record<IconName, string> = {
   costs: 'M4 20V10 M10 20V4 M16 20v-7 M22 20H2',
   messages: 'M4 4h16v13H8l-4 4z',
   projects: 'M4 4h6l2 2h8v12H4z',
+  requests: 'M3 11l18-7-7 18-2-8-8-3z',
   close: 'M6 6l12 12 M18 6L6 18',
   check: 'M4 12l5 5L20 6',
   x: 'M6 6l12 12 M18 6L6 18',
