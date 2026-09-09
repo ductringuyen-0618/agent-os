@@ -8,6 +8,7 @@ import matter from 'gray-matter'
 import type { AdapterHost } from '../../adapters/adapterHost.js'
 import type { AdapterContext, ProjectAdapter } from '../../adapters/types.js'
 import type { KernelConfig } from '../../config.js'
+import { type PrChecks, getFailedJobLog, getPrChecks } from '../../github/gh.js'
 import type { EventLog } from '../../log/eventLog.js'
 import type { RunResult } from '../../process/processManager.js'
 import type { WikiService } from '../../wiki/wikiService.js'
@@ -41,12 +42,25 @@ export interface FeatureRequestKernelDeps {
  * assigned immediately after `createKernel(...)` returns; it is only ever
  * invoked from inside `run()`, well after that assignment has happened.
  */
+export interface FeatureRequestGithub {
+  getPrChecks(repo: string, number: number): Promise<PrChecks>
+  getFailedJobLog(repo: string, url: string): Promise<string>
+}
+
 export interface FeatureRequestDeps {
   registry: Record<string, ProjectAdapter>
   getKernel: () => FeatureRequestKernelDeps
+  /** GitHub access for the CI gate; defaults to the local gh CLI. */
+  github?: FeatureRequestGithub
+  /** How long the CI gate waits for checks to finish (default 30 min). */
+  ciTimeoutMs?: number
+  /** Polling interval for the CI gate (default 30 s). */
+  ciPollMs?: number
 }
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+const CI_TIMEOUT_MS = 30 * 60 * 1000
+const CI_POLL_MS = 30 * 1000
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1000
 
 function requireFeatureRequestOps(
@@ -102,7 +116,7 @@ async function runBuildStep(
   ctx: WorkflowContext<FeatureRequestInput>,
   project: ProjectConfig,
   task: Record<string, unknown>,
-  stepName: 'build' | 'build-fix',
+  stepName: 'build' | 'build-fix' | 'build-fix-ci',
 ): Promise<void> {
   // biome-ignore lint/style/noNonNullAssertion: only called after the !project.build?.enabled guard in run() returns early
   const build = project.build!
@@ -349,8 +363,8 @@ export function createFeatureRequestWorkflow(
         }
       }
 
-      const openPr = await ctx.step.do('open-pr', {}, async () => {
-        const pr = await ops.openPullRequest(actx, {
+      const openPr = await ctx.step.do('open-pr', {}, () =>
+        ops.openPullRequest(actx, {
           branch,
           slug,
           title: ctx.input.title,
@@ -358,16 +372,70 @@ export function createFeatureRequestWorkflow(
           proposalWhatWhy: extractWhatWhy(proposalBody),
           validationOutput: validateOutcome.text,
           reviewOutput: reviewOutcome.text,
-        })
+        }),
+      )
+
+      // CI gate: nothing is shipped until the pull request's checks pass.
+      // Local validation is necessary, never sufficient. One fix cycle is
+      // allowed; a second red CI fails the request and leaves the branch
+      // and PR in place for a human.
+      let ciSummary = openPr.skipped ? `no CI: ${openPr.skipped}` : 'CI not run'
+      if (openPr.number > 0) {
+        const github = deps.github ?? {
+          getPrChecks,
+          getFailedJobLog,
+        }
+        const first = await waitForChecks(
+          ctx,
+          github,
+          project.repo,
+          openPr.number,
+          deps,
+          1,
+        )
+        if (first.failed.length > 0) {
+          const log = await ctx.step.do('ci-failure-log', {}, () =>
+            github.getFailedJobLog(project.repo, first.failed[0].url),
+          )
+          const ciFailure = [
+            `CI failed on the pull request: ${first.failed.map((f) => f.name).join(', ')}`,
+            log ? `\nFailing job log (tail):\n${log}` : '',
+          ].join('')
+          await runBuildStep(
+            ctx,
+            project,
+            { ...buildTask, priorFailure: ciFailure },
+            'build-fix-ci',
+          )
+          await ctx.step.do('push-fix', {}, () => ops.pushBranch(actx, branch))
+          const second = await waitForChecks(
+            ctx,
+            github,
+            project.repo,
+            openPr.number,
+            deps,
+            2,
+          )
+          if (second.failed.length > 0) {
+            throw new Error(
+              `CI still failing after one fix attempt: ${second.failed.map((f) => f.name).join(', ')} (${openPr.url})`,
+            )
+          }
+          ciSummary = `CI passed after one fix: ${second.passed.join(', ')}`
+        } else {
+          ciSummary = `CI passed: ${first.passed.join(', ')}`
+        }
+      }
+
+      await ctx.step.do('ship', {}, async () => {
         await ops.markShipped(actx, slug, pushResult.file)
         await ops.writeReport(actx, {
           slug,
           branch,
-          prUrl: pr.url || (pr.skipped ?? ''),
-          validationOutput: validateOutcome.text,
+          prUrl: openPr.url || (openPr.skipped ?? ''),
+          validationOutput: `${validateOutcome.text}\n\n${ciSummary}`,
           reviewOutput: reviewOutcome.text,
         })
-        return pr
       })
 
       await ctx.step.do('done', {}, async () => {
@@ -393,6 +461,41 @@ export function createFeatureRequestWorkflow(
       })
     },
   }
+}
+
+/**
+ * Polls the pull request's checks until none is pending, sleeping between
+ * polls through the engine so a restart resumes the wait instead of
+ * restarting it. Returns the final check state; throws on timeout.
+ */
+async function waitForChecks(
+  ctx: WorkflowContext<FeatureRequestInput>,
+  github: FeatureRequestGithub,
+  repo: string,
+  number: number,
+  deps: FeatureRequestDeps,
+  round: number,
+): Promise<PrChecks> {
+  const timeoutMs = deps.ciTimeoutMs ?? CI_TIMEOUT_MS
+  const pollMs = deps.ciPollMs ?? CI_POLL_MS
+  const maxPolls = Math.max(1, Math.ceil(timeoutMs / pollMs))
+  for (let i = 1; i <= maxPolls; i++) {
+    const checks = await ctx.step.do(`ci-${round}-poll-${i}`, {}, () =>
+      github.getPrChecks(repo, number),
+    )
+    ctx.emit('workflow.ci', {
+      round,
+      poll: i,
+      pending: checks.pending,
+      failed: checks.failed.map((f) => f.name),
+      passed: checks.passed,
+    })
+    if (checks.pending.length === 0) return checks
+    if (i < maxPolls) await ctx.step.sleep(`ci-${round}-sleep-${i}`, pollMs)
+  }
+  throw new Error(
+    `CI did not finish within ${Math.round(timeoutMs / 60000)} minutes`,
+  )
 }
 
 function hasProjectField(input: unknown): input is { project: string } {

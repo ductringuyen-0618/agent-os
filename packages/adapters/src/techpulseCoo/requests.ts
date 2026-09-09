@@ -309,3 +309,17 @@ export async function writeReport(
 
   return { file: relPath, sha: commitResult.commit }
 }
+
+/** Push the branch after a fix commit so CI re-runs on the open pull request. */
+export async function pushBranch(
+  ctx: AdapterContext,
+  branch: string,
+): Promise<void> {
+  const git = simpleGit(ctx.project.clone)
+  await git.push('origin', branch)
+  ctx.log.append({
+    type: 'git.push',
+    runId: ctx.runId,
+    payload: { branch, reason: 'ci-fix' },
+  })
+}

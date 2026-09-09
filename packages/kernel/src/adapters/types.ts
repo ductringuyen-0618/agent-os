@@ -87,6 +87,8 @@ export interface FeatureRequestAdapterOps {
     ctx: AdapterContext,
     input: FeatureRequestWriteReportInput,
   ): Promise<FeatureRequestWriteReportResult>
+  /** Push the request branch again after a fix commit (CI retry). */
+  pushBranch(ctx: AdapterContext, branch: string): Promise<void>
 }
 
 export interface ProjectAdapter {
