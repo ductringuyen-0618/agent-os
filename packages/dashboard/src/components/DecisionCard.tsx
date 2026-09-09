@@ -1,24 +1,16 @@
 import type { Decision } from '@agentos/shared'
 import { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
 import { ApiClient } from '../api/client'
+import { brief, firstLine } from '../lib/proposal'
 import { relativeTime } from '../lib/time'
 import { ConfirmSheet } from './ConfirmSheet'
+import { DecisionBrief, EffortChip } from './DecisionBrief'
 import { StatusBadge } from './StatusBadge'
 import { useToast } from './Toast'
 
 const client = new ApiClient()
 
 type Kind = 'approve' | 'reject'
-
-/** First paragraph of the body, headings stripped, for the compact card. */
-function summary(body: string): string {
-  const line = body
-    .split('\n')
-    .map((l) => l.trim())
-    .find((l) => l.length > 0 && !l.startsWith('#') && !l.startsWith('---'))
-  return line ? line.replace(/^([-*+]|\d+\.)\s+/, '').replace(/[*_`]/g, '') : ''
-}
 
 function consequence(decision: Decision, kind: Kind): string {
   const verb = kind === 'approve' ? 'approved' : 'rejected'
@@ -108,20 +100,34 @@ export function DecisionCard({
   )
 
   if (variant === 'compact') {
-    const text = summary(decision.body)
+    const b = brief(decision.body)
+    const what = firstLine(b.what)
+    const why = firstLine(b.why)
     return (
       <div className="card border-l-2 border-l-signal p-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="truncate font-medium text-text">
               {decision.title}
             </div>
-            {text && (
-              <p className="mt-0.5 line-clamp-2 text-xs text-muted">{text}</p>
+            {what && (
+              <p className="mt-1 line-clamp-2 text-xs text-muted">
+                <span className="text-accent">What: </span>
+                {what}
+              </p>
             )}
-            <div className="mt-1 font-mono text-[11px] text-muted/80">
-              {decision.adapter ? `${decision.adapter}, ` : ''}
-              {relativeTime(decision.createdAt)}
+            {why && (
+              <p className="mt-0.5 line-clamp-2 text-xs text-muted">
+                <span className="text-signal">Why now: </span>
+                {why}
+              </p>
+            )}
+            <div className="mt-1.5 flex items-center gap-2 font-mono text-[11px] text-muted/80">
+              <EffortChip effort={b.effort} />
+              <span>
+                {decision.adapter ? `${decision.adapter}, ` : ''}
+                {relativeTime(decision.createdAt)}
+              </span>
             </div>
           </div>
         </div>
@@ -138,6 +144,7 @@ export function DecisionCard({
           <h3 className="text-base font-medium text-text">{decision.title}</h3>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
             <StatusBadge status={decision.status} />
+            <EffortChip effort={brief(decision.body).effort} />
             {decision.adapter && (
               <span className="chip">{decision.adapter}</span>
             )}
@@ -155,8 +162,8 @@ export function DecisionCard({
         </div>
         {actions}
       </header>
-      <div className="prose-agentos min-h-0 flex-1">
-        <ReactMarkdown>{decision.body}</ReactMarkdown>
+      <div className="min-h-0 flex-1">
+        <DecisionBrief body={decision.body} />
       </div>
       {sheet}
     </article>

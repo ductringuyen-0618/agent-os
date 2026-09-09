@@ -60,22 +60,22 @@ function extractTitle(content: string): string {
   return h1 ? h1[1].trim() : 'Untitled proposal'
 }
 
+const MAX_BODY_CHARS = 40_000
+
+/**
+ * The decision body is the whole proposal (minus frontmatter): the person
+ * approving it should be able to read what they get, why now, the plan,
+ * the validation contract and the risks without opening the repo.
+ */
 function extractDecisionBody(content: string): string {
-  const why = content.match(
-    /^##\s+Why this increases engagement\s*\n([\s\S]*?)(?=\n##\s|$)/m,
-  )
-  const effort = content.match(
-    /^##\s+Effort estimate\s*\n([\s\S]*?)(?=\n##\s|$)/m,
-  )
-  if (why || effort) {
-    return [
-      why ? `## Why this increases engagement\n${why[1].trim()}` : null,
-      effort ? `## Effort estimate\n${effort[1].trim()}` : null,
-    ]
-      .filter((s): s is string => s !== null)
-      .join('\n\n')
-  }
-  return content.slice(0, 1500)
+  // Clones on Windows may carry CRLF, so normalise before stripping.
+  const body = content
+    .replace(/\r\n/g, '\n')
+    .replace(/^---\n[\s\S]*?\n---\n?/, '')
+    .trim()
+  return body.length > MAX_BODY_CHARS
+    ? `${body.slice(0, MAX_BODY_CHARS)}\n\n_(truncated)_`
+    : body
 }
 
 async function ensureDecision(
@@ -86,10 +86,27 @@ async function ensureDecision(
   const existing = ctx.log
     .listDecisions()
     .find((d) => d.adapter === 'techpulse-coo' && d.ref === file)
-  if (existing) return
+  const title = extractTitle(content)
+  const body = extractDecisionBody(content)
+  if (existing) {
+    // A proposal edited while still pending should read the same in the
+    // dashboard as in the repo. Resolved decisions keep what was decided on.
+    if (
+      existing.status === 'pending' &&
+      (existing.title !== title || existing.body !== body)
+    ) {
+      ctx.log.updateDecision(existing.id, { title, body })
+      ctx.log.append({
+        type: 'decision.updated',
+        runId: ctx.runId,
+        payload: { decisionId: existing.id, ref: file },
+      })
+    }
+    return
+  }
   const decision = ctx.log.createDecision({
-    title: extractTitle(content),
-    body: extractDecisionBody(content),
+    title,
+    body,
     adapter: 'techpulse-coo',
     ref: file,
     createdByRun: ctx.runId,

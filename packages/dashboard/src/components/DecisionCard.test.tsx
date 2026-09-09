@@ -99,7 +99,35 @@ describe('DecisionCard', () => {
   })
 })
 
-describe('DecisionCard summary', () => {
+describe('DecisionCard compact brief', () => {
+  it('shows what and why-now lines from the proposal sections', () => {
+    installMockFetch()
+    render(
+      <ToastProvider>
+        <DecisionCard
+          decision={{
+            ...fixtures.decision,
+            body: [
+              '## What you get',
+              'A cap.',
+              '',
+              '## Why start this now',
+              'Spend is invisible.',
+              '',
+              '## Effort estimate',
+              'S — tiny.',
+            ].join('\n'),
+          }}
+          onResolved={() => {}}
+          variant="compact"
+        />
+      </ToastProvider>,
+    )
+    expect(screen.getByText('A cap.')).toBeInTheDocument()
+    expect(screen.getByText('Spend is invisible.')).toBeInTheDocument()
+    expect(screen.getByTitle('Effort estimate')).toHaveTextContent('S')
+  })
+
   it('strips list markers from the first body line', () => {
     installMockFetch()
     render(

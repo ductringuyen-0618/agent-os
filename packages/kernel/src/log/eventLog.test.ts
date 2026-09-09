@@ -73,6 +73,15 @@ describe('EventLog', () => {
     expect(log.listDecisions({ status: 'approved' })).toHaveLength(1)
   })
 
+  it('updates a decision title and body in place', () => {
+    const decision = log.createDecision({ title: 'Old', body: 'old body' })
+    const updated = log.updateDecision(decision.id, { body: 'new body' })
+    expect(updated.title).toBe('Old')
+    expect(updated.body).toBe('new body')
+    expect(updated.status).toBe('pending')
+    expect(() => log.updateDecision('nope', { body: 'x' })).toThrow(/not found/)
+  })
+
   it('sends and reads inbox messages', () => {
     log.sendMessage({ from: 'ops', to: 'librarian', body: 'hello' })
     const inbox = log.readInbox('librarian')

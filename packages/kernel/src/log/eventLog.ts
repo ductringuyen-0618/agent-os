@@ -316,6 +316,19 @@ export class EventLog {
     return this.listDecisions().find((d) => d.id === id)
   }
 
+  /** Rewrite a pending decision's title/body (e.g. its proposal was edited). */
+  updateDecision(
+    id: string,
+    patch: { title?: string; body?: string },
+  ): Decision {
+    const current = this.getDecision(id)
+    if (!current) throw new Error(`Decision not found: ${id}`)
+    this.db
+      .prepare('UPDATE decisions SET title = ?, body = ? WHERE id = ?')
+      .run(patch.title ?? current.title, patch.body ?? current.body, id)
+    return this.getDecision(id) as Decision
+  }
+
   sendMessage(m: Omit<Message, 'id' | 'ts'>): Message {
     const id = genId()
     const ts = nowIso()
