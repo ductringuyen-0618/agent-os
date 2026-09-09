@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { AdapterContext } from '@agentos/kernel/adapters/types'
@@ -86,5 +86,63 @@ describe('techpulseCooAdapter.sync', () => {
     const second = await techpulseCooAdapter.sync(ctx)
     expect(second.added).toEqual([])
     expect(second.changed).toEqual([])
+  })
+})
+
+describe('techpulseCooAdapter.sync — decisions', () => {
+  it('creates a pending decision for a newly-proposed proposal', async () => {
+    const { cloneDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+
+    await techpulseCooAdapter.sync(ctx)
+
+    // biome-ignore lint/suspicious/noExplicitAny: fakeCtx's log stub exposes listDecisions beyond the AdapterContext type
+    const decisions = (ctx.log as any).listDecisions()
+    expect(decisions).toHaveLength(1)
+    expect(decisions[0]).toMatchObject({
+      adapter: 'techpulse-coo',
+      ref: path.join('proposals', '001-dark-mode.md'),
+      status: 'pending',
+      title: 'Add dark mode toggle',
+    })
+    expect(decisions[0].body).toContain('Why this increases engagement')
+    expect(decisions[0].body).toContain('Effort estimate')
+  })
+
+  it('does not duplicate a decision on a second sync', async () => {
+    const { cloneDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+    await techpulseCooAdapter.sync(ctx)
+    await techpulseCooAdapter.sync(ctx)
+    // biome-ignore lint/suspicious/noExplicitAny: fakeCtx's log stub exposes listDecisions beyond the AdapterContext type
+    expect((ctx.log as any).listDecisions()).toHaveLength(1)
+  })
+
+  it('emits proposal.changed when a mirrored status transitions', async () => {
+    const { cloneDir, seedDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+    await techpulseCooAdapter.sync(ctx)
+
+    const seedGit = (await import('simple-git')).default(seedDir)
+    const proposalPath = path.join(
+      seedDir,
+      'docs/missions/coo/proposals/001-dark-mode.md',
+    )
+    writeFileSync(
+      proposalPath,
+      readFileSync(proposalPath, 'utf8').replace(
+        'status: proposed',
+        'status: approved',
+      ),
+    )
+    await seedGit.add('.')
+    await seedGit.commit('approve')
+    await seedGit.push('origin', 'main')
+
+    const result = await techpulseCooAdapter.sync(ctx)
+    expect(result.events).toContain('proposal.changed')
   })
 })

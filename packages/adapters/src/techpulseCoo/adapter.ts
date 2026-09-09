@@ -49,6 +49,52 @@ interface MirrorOutcome {
   newContent: string
 }
 
+function extractTitle(content: string): string {
+  const h1 = content.match(/^#\s+(.+)$/m)
+  return h1 ? h1[1].trim() : 'Untitled proposal'
+}
+
+function extractDecisionBody(content: string): string {
+  const why = content.match(
+    /^##\s+Why this increases engagement\s*\n([\s\S]*?)(?=\n##\s|$)/m,
+  )
+  const effort = content.match(
+    /^##\s+Effort estimate\s*\n([\s\S]*?)(?=\n##\s|$)/m,
+  )
+  if (why || effort) {
+    return [
+      why ? `## Why this increases engagement\n${why[1].trim()}` : null,
+      effort ? `## Effort estimate\n${effort[1].trim()}` : null,
+    ]
+      .filter((s): s is string => s !== null)
+      .join('\n\n')
+  }
+  return content.slice(0, 1500)
+}
+
+async function ensureDecision(
+  ctx: AdapterContext,
+  file: string,
+  content: string,
+): Promise<void> {
+  const existing = ctx.log
+    .listDecisions()
+    .find((d) => d.adapter === 'techpulse-coo' && d.ref === file)
+  if (existing) return
+  const decision = ctx.log.createDecision({
+    title: extractTitle(content),
+    body: extractDecisionBody(content),
+    adapter: 'techpulse-coo',
+    ref: file,
+    createdByRun: ctx.runId,
+  })
+  ctx.log.append({
+    type: 'decision.created',
+    runId: ctx.runId,
+    payload: { decisionId: decision.id, ref: file },
+  })
+}
+
 async function mirrorFile(
   ctx: AdapterContext,
   srcPath: string,
@@ -93,12 +139,29 @@ export const techpulseCooAdapter: ProjectAdapter = {
 
     const proposalsDir = path.join(ctx.project.clone, opts.proposals_path)
     for (const file of await listMdFiles(proposalsDir)) {
-      await mirrorFile(
+      const destRel = path.join('proposals', file)
+      const mirrored = await mirrorFile(
         ctx,
         path.join(proposalsDir, file),
-        path.join('proposals', file),
+        destRel,
         result,
       )
+      if (!mirrored) continue
+      const newStatus = readStatus(mirrored.newContent)
+      const oldStatus = mirrored.oldContent
+        ? readStatus(mirrored.oldContent)
+        : undefined
+      if (oldStatus && oldStatus !== newStatus) {
+        result.events.push('proposal.changed')
+        ctx.log.append({
+          type: 'proposal.changed',
+          runId: ctx.runId,
+          payload: { file: destRel, oldStatus, newStatus },
+        })
+      }
+      if (newStatus === 'proposed') {
+        await ensureDecision(ctx, destRel, mirrored.newContent)
+      }
     }
 
     const reportsDir = path.join(ctx.project.clone, opts.reports_path)
