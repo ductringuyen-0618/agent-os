@@ -280,11 +280,50 @@ export class Scheduler {
       }
     }
   }
-  private recoverFromRestart(): void {}
-  setEnabled(_name: string, _enabled: boolean): void {
-    throw new Error('not implemented until Task 6')
+  private recoverFromRestart(): void {
+    for (const run of this.log.listRuns({ status: 'running' })) {
+      this.log.updateRun(run.id, {
+        status: 'failed',
+        error: 'daemon restarted',
+        endedAt: new Date().toISOString(),
+      })
+      const lr = this.routines.get(run.routine)
+      if (!lr) continue
+      if (run.attempt < this.effectiveMaxAttempts(lr.config)) {
+        const retryRun = this.log.createRun({
+          routine: run.routine,
+          skill: run.skill,
+          adapter: run.adapter,
+          agent: run.agent,
+          payload: run.payload,
+          attempt: run.attempt + 1,
+        })
+        this.executeRoutine(retryRun, lr.config, run.payload).catch(() => {})
+      }
+    }
+    for (const run of this.log.listRuns({ status: 'queued' })) {
+      const lr = this.routines.get(run.routine)
+      if (lr) this.executeRoutine(run, lr.config, run.payload).catch(() => {})
+    }
   }
+
+  setEnabled(name: string, enabled: boolean): void {
+    const lr = this.routines.get(name)
+    if (!lr) throw new Error(`unknown routine: ${name}`)
+    lr.enabled = enabled
+  }
+
+  private computeNextRun(lr: LoadedRoutine): string | undefined {
+    if (lr.cronJob) return lr.cronJob.nextRun()?.toISOString()
+    if (lr.nextRunAt) return lr.nextRunAt.toISOString()
+    return undefined
+  }
+
   list(): Array<{ routine: RoutineConfig; nextRun?: string; lastRun?: Run }> {
-    throw new Error('not implemented until Task 6')
+    return Array.from(this.routines.values()).map((lr) => ({
+      routine: { ...lr.config, enabled: lr.enabled },
+      nextRun: this.computeNextRun(lr),
+      lastRun: this.log.listRuns({ routine: lr.config.name, limit: 1 })[0],
+    }))
   }
 }
