@@ -284,15 +284,13 @@ export function createWorkflowContext<I = Record<string, unknown>>(
       mcpConfigPath,
       timeoutMs: spec.timeoutMs ?? deps.defaults.timeout_ms,
     }
-    const result = await deps.pm.runToCompletion(
-      kernelRun,
-      {
-        prompt: assembled.prompt,
-        systemPromptAppend: assembled.systemPromptAppend,
-        ...common,
-      },
-      { skill: spec.skill, osRoot: deps.cfg.osRoot, ...common },
-    )
+    // No wrap-up turn for workflow steps: the workflow orchestrates them,
+    // and the main turn's result text is what the next step reads.
+    const result = await deps.pm.runToCompletion(kernelRun, {
+      prompt: assembled.prompt,
+      systemPromptAppend: assembled.systemPromptAppend,
+      ...common,
+    })
     if (result.status !== 'success') {
       const errorMsg = result.error ?? `run ended with status ${result.status}`
       deps.store.updateStep(row.id, {

@@ -216,10 +216,16 @@ export class ProcessManager {
     }
   }
 
+  /**
+   * Main turn, then (unless `wrapUp` is omitted) the kernel-driven wrap-up
+   * turn that records learnings and a handoff. Workflow steps pass no
+   * wrapUp: they are orchestrated by the workflow, and the main turn's
+   * result text is their output.
+   */
   async runToCompletion(
     run: Run,
     mainSpec: SpawnSpec,
-    wrapUp: WrapUpSpec,
+    wrapUp?: WrapUpSpec,
   ): Promise<RunResult> {
     this.log.updateRun(run.id, { status: 'running' })
     const mainResult = await this.start(run, mainSpec)
@@ -231,6 +237,18 @@ export class ProcessManager {
         status,
         endedAt: new Date().toISOString(),
         error: mainResult.error,
+      })
+      return mainResult
+    }
+
+    if (!wrapUp) {
+      this.log.updateRun(run.id, {
+        status: 'success',
+        endedAt: new Date().toISOString(),
+        sessionId: mainResult.sessionId,
+        costUsd: mainResult.costUsd,
+        inputTokens: mainResult.inputTokens,
+        outputTokens: mainResult.outputTokens,
       })
       return mainResult
     }
@@ -271,7 +289,13 @@ export class ProcessManager {
       error: finalStatus === 'failed' ? wrapResult.error : undefined,
     })
 
-    return { ...wrapResult, status: finalStatus }
+    // The main turn did the work; its result text is the run's result. The
+    // wrap-up's own text is bookkeeping and must not replace it.
+    return {
+      ...wrapResult,
+      status: finalStatus,
+      resultText: mainResult.resultText ?? wrapResult.resultText,
+    }
   }
 
   kill(runId: string): boolean {
