@@ -14,6 +14,7 @@ import fastifyStatic from '@fastify/static'
 import fastifyWebsocket from '@fastify/websocket'
 import Fastify, { type FastifyInstance } from 'fastify'
 import type { Kernel } from '../kernel.js'
+import { registerGithubRoutes } from './github.js'
 import { registerInternalRoutes } from './internal.js'
 
 const VERSION = '0.1.0'
@@ -104,6 +105,7 @@ export function buildServer(kernel: Kernel): FastifyInstance {
   )
 
   registerInternalRoutes(app, { log, wiki, scheduler, osRoot: cfg.osRoot })
+  registerGithubRoutes(app)
 
   app.get('/api/runs', async (req) => {
     const q = req.query as { status?: string; routine?: string; limit?: string }
