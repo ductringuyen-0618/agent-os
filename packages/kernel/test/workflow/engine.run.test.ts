@@ -16,6 +16,26 @@ const fixturesDir = fileURLToPath(
   new URL('../../../../tools/fake-claude/fixtures', import.meta.url),
 )
 
+/**
+ * Waits until `engine.get(id)` reaches one of `statuses`, instead of a fixed
+ * sleep. A fixed sleep here is racy under CPU contention (e.g. this
+ * workspace's other packages' test suites, or sibling agents, running
+ * concurrently) since these tests exercise a real or mocked async
+ * completion rather than fixed in-process work.
+ */
+async function waitForStatus(
+  engine: WorkflowEngine,
+  id: string,
+  statuses: string[],
+  timeoutMs = 8_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (statuses.includes(engine.get(id)?.status ?? '')) return
+    await new Promise((r) => setTimeout(r, 25))
+  }
+}
+
 async function makeOsRoot() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'agentos-wf-'))
   await fs.mkdir(path.join(dir, 'agents', 'ops', 'workspace'), {
@@ -67,7 +87,7 @@ describe('WorkflowEngine step.run', () => {
     const instance = await engine.create('brief-only', {
       title: 'Add dark mode',
     })
-    await new Promise((r) => setTimeout(r, 20))
+    await waitForStatus(engine, instance.id, ['succeeded', 'failed'])
 
     expect(engine.get(instance.id)?.status).toBe('succeeded')
     expect(engine.get(instance.id)?.state.sessionId).toBe('s1')
@@ -103,7 +123,7 @@ describe('WorkflowEngine step.run', () => {
     engine.registry.register(def)
 
     const instance = await engine.create('brief-fails', {})
-    await new Promise((r) => setTimeout(r, 20))
+    await waitForStatus(engine, instance.id, ['succeeded', 'failed'])
 
     expect(engine.get(instance.id)?.status).toBe('failed')
     expect(engine.get(instance.id)?.error).toBe('brief crashed')
@@ -137,8 +157,8 @@ describe('WorkflowEngine step.run', () => {
     engine.registry.register(def)
 
     const instance = await engine.create('brief-real', {})
-    await new Promise((r) => setTimeout(r, 500))
+    await waitForStatus(engine, instance.id, ['succeeded', 'failed'])
 
     expect(engine.get(instance.id)?.status).toBe('succeeded')
-  }, 10_000)
+  }, 15_000)
 })
