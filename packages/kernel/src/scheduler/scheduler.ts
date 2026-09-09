@@ -326,6 +326,32 @@ export class Scheduler {
     lr.enabled = enabled
   }
 
+  /**
+   * Idempotent upsert by name: registering a name that's already loaded
+   * stops and replaces its existing timer instead of doubling it. If the
+   * Scheduler is already started, the routine's every:/cron timer begins
+   * immediately -- no daemon restart (no need to call load()/start() again).
+   */
+  registerRoutine(config: RoutineConfig): void {
+    const existing = this.routines.get(config.name)
+    if (existing) {
+      existing.cronJob?.stop()
+      if (existing.intervalHandle) clearInterval(existing.intervalHandle)
+    }
+    const lr: LoadedRoutine = { config, enabled: config.enabled !== false }
+    this.routines.set(config.name, lr)
+    if (this.started) this.scheduleRoutine(lr)
+  }
+
+  /** Stops any timer for `name` and removes it; no-op if unknown. */
+  unregisterRoutine(name: string): void {
+    const lr = this.routines.get(name)
+    if (!lr) return
+    lr.cronJob?.stop()
+    if (lr.intervalHandle) clearInterval(lr.intervalHandle)
+    this.routines.delete(name)
+  }
+
   private computeNextRun(lr: LoadedRoutine): string | undefined {
     if (lr.cronJob) return lr.cronJob.nextRun()?.toISOString()
     if (lr.nextRunAt) return lr.nextRunAt.toISOString()
