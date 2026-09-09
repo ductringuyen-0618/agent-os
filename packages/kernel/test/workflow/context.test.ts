@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { KernelConfig } from '../../src/config.js'
-import { createWorkflowContext } from '../../src/workflow/context.js'
+import {
+  WorkflowSuspended,
+  createWorkflowContext,
+} from '../../src/workflow/context.js'
 import { WorkflowStore } from '../../src/workflow/store.js'
 import { FakeEventLog } from '../helpers/fakeEventLog.js'
 
@@ -128,5 +131,119 @@ describe('createWorkflowContext: step.do', () => {
     await expect(
       ctx.step.do('brief', { retries: 0, timeoutMs: 20 }, neverResolves),
     ).rejects.toThrow(/timed out/)
+  })
+})
+
+describe('createWorkflowContext: step.sleep', () => {
+  it('suspends on first call and sets the instance to sleeping with a wakeAt', async () => {
+    const log = new FakeEventLog()
+    const { deps, store } = makeDeps(log)
+    const instance = store.create({ kind: 'fake', title: 't', input: {} })
+    const ctx = createWorkflowContext(deps, instance)
+
+    await expect(ctx.step.sleep('cooldown', 5000)).rejects.toBeInstanceOf(
+      WorkflowSuspended,
+    )
+
+    const updated = store.get(instance.id)
+    expect(updated?.status).toBe('sleeping')
+    expect(updated?.currentStep).toBe('cooldown')
+    expect(updated?.wakeAt).toBeDefined()
+    expect(store.getStep(instance.id, 'cooldown')?.status).toBe('sleeping')
+  })
+
+  it('re-suspends on replay before wakeAt, and resolves once wakeAt has passed', async () => {
+    const log = new FakeEventLog()
+    const { deps, store } = makeDeps(log)
+    const instance = store.create({ kind: 'fake', title: 't', input: {} })
+    await createWorkflowContext(deps, instance)
+      .step.sleep('cooldown', 50)
+      .catch(() => {})
+
+    // biome-ignore lint/style/noNonNullAssertion: created above
+    const tooSoon = createWorkflowContext(deps, store.get(instance.id)!)
+    await expect(tooSoon.step.sleep('cooldown', 50)).rejects.toBeInstanceOf(
+      WorkflowSuspended,
+    )
+
+    await new Promise((r) => setTimeout(r, 60))
+    // biome-ignore lint/style/noNonNullAssertion: created above
+    const dueCtx = createWorkflowContext(deps, store.get(instance.id)!)
+    await expect(dueCtx.step.sleep('cooldown', 50)).resolves.toBeUndefined()
+    expect(store.getStep(instance.id, 'cooldown')?.status).toBe('succeeded')
+  })
+})
+
+describe('createWorkflowContext: step.waitForEvent', () => {
+  it('suspends and records wait_event on the instance', async () => {
+    const log = new FakeEventLog()
+    const { deps, store } = makeDeps(log)
+    const instance = store.create({ kind: 'fake', title: 't', input: {} })
+    const ctx = createWorkflowContext(deps, instance)
+
+    await expect(
+      ctx.step.waitForEvent('await-approval', 'decision.resolved', {
+        timeoutMs: 60_000,
+      }),
+    ).rejects.toBeInstanceOf(WorkflowSuspended)
+
+    const updated = store.get(instance.id)
+    expect(updated?.status).toBe('waiting')
+    expect(updated?.waitEvent).toBe('decision.resolved')
+  })
+
+  it('resolves with the matching event payload once one arrives, applying opts.match', async () => {
+    const log = new FakeEventLog()
+    const { deps, store } = makeDeps(log)
+    const instance = store.create({ kind: 'fake', title: 't', input: {} })
+    await createWorkflowContext(deps, instance)
+      .step.waitForEvent('await-approval', 'decision.resolved', {
+        timeoutMs: 60_000,
+      })
+      .catch(() => {})
+
+    log.append({ type: 'decision.resolved', payload: { id: 'other-decision' } })
+    log.append({
+      type: 'decision.resolved',
+      payload: { id: 'd1', ref: '001-slug.md' },
+    })
+
+    // biome-ignore lint/style/noNonNullAssertion: created above
+    const replay = createWorkflowContext(deps, store.get(instance.id)!)
+    const result = await replay.step.waitForEvent(
+      'await-approval',
+      'decision.resolved',
+      {
+        timeoutMs: 60_000,
+        match: (e) => (e.payload as { ref?: string }).ref === '001-slug.md',
+      },
+    )
+
+    expect(result).toEqual({ id: 'd1', ref: '001-slug.md' })
+    expect(store.getStep(instance.id, 'await-approval')?.status).toBe(
+      'succeeded',
+    )
+  })
+
+  it('fails the step with a timeout error once wakeAt has passed with no match', async () => {
+    const log = new FakeEventLog()
+    const { deps, store } = makeDeps(log)
+    const instance = store.create({ kind: 'fake', title: 't', input: {} })
+    await createWorkflowContext(deps, instance)
+      .step.waitForEvent('await-approval', 'decision.resolved', {
+        timeoutMs: 30,
+      })
+      .catch(() => {})
+
+    await new Promise((r) => setTimeout(r, 40))
+    // biome-ignore lint/style/noNonNullAssertion: created above
+    const replay = createWorkflowContext(deps, store.get(instance.id)!)
+
+    await expect(
+      replay.step.waitForEvent('await-approval', 'decision.resolved', {
+        timeoutMs: 30,
+      }),
+    ).rejects.toThrow(/timed out/)
+    expect(store.getStep(instance.id, 'await-approval')?.status).toBe('failed')
   })
 })

@@ -95,16 +95,98 @@ export function createWorkflowContext<I = Record<string, unknown>>(
     throw lastErr instanceof Error ? lastErr : new Error(errorMsg)
   }
 
-  async function stepSleep(_name: string, _ms: number): Promise<void> {
-    throw new Error('not implemented until Task 5')
+  async function stepSleep(name: string, ms: number): Promise<void> {
+    seq += 1
+    const mySeq = seq
+    const row = deps.store.getStep(instance.id, name)
+    if (row?.status === 'succeeded') return
+    if (!row) {
+      const wakeAt = new Date(Date.now() + ms).toISOString()
+      deps.store.createStep(instance.id, name, mySeq, 'sleeping')
+      deps.store.update(instance.id, {
+        status: 'sleeping',
+        currentStep: name,
+        wakeAt,
+        waitEvent: undefined,
+      })
+      deps.onStepEvent('workflow.waiting', {
+        step: name,
+        seq: mySeq,
+        mode: 'sleep',
+        wakeAt,
+      })
+      throw new WorkflowSuspended()
+    }
+    const current = deps.store.get(instance.id)
+    if (current?.wakeAt && Date.now() < new Date(current.wakeAt).getTime()) {
+      throw new WorkflowSuspended()
+    }
+    deps.store.updateStep(row.id, {
+      status: 'succeeded',
+      endedAt: new Date().toISOString(),
+    })
+    deps.onStepEvent('workflow.step.succeeded', { step: name, seq: mySeq })
   }
 
   async function stepWaitForEvent<T>(
-    _name: string,
-    _eventType: EventType,
-    _opts: { match?: (e: Event) => boolean; timeoutMs: number },
+    name: string,
+    eventType: EventType,
+    opts: { match?: (e: Event) => boolean; timeoutMs: number },
   ): Promise<T> {
-    throw new Error('not implemented until Task 5')
+    seq += 1
+    const mySeq = seq
+    let row = deps.store.getStep(instance.id, name)
+    if (row?.status === 'succeeded') return row.output as T
+    if (!row) {
+      const wakeAt = new Date(Date.now() + opts.timeoutMs).toISOString()
+      row = deps.store.createStep(instance.id, name, mySeq, 'waiting')
+      deps.store.update(instance.id, {
+        status: 'waiting',
+        currentStep: name,
+        wakeAt,
+        waitEvent: eventType,
+      })
+      deps.onStepEvent('workflow.waiting', {
+        step: name,
+        seq: mySeq,
+        mode: 'event',
+        eventType,
+        wakeAt,
+      })
+    }
+    const since = row.startedAt
+    const matches = deps.log
+      .listEvents({ types: [eventType] })
+      .filter((e) => e.ts >= since && (!opts.match || opts.match(e)))
+    const match = matches[0]
+    if (match) {
+      deps.store.updateStep(row.id, {
+        status: 'succeeded',
+        output: match.payload,
+        endedAt: new Date().toISOString(),
+      })
+      state[name] = match.payload
+      deps.store.update(instance.id, { state })
+      deps.onStepEvent('workflow.step.succeeded', { step: name, seq: mySeq })
+      return match.payload as T
+    }
+    const current = deps.store.get(instance.id)
+    if (current?.wakeAt && Date.now() >= new Date(current.wakeAt).getTime()) {
+      deps.store.updateStep(row.id, {
+        status: 'failed',
+        error: 'timeout',
+        endedAt: new Date().toISOString(),
+      })
+      deps.onStepEvent('workflow.step.failed', {
+        step: name,
+        seq: mySeq,
+        error: 'timeout',
+      })
+      throw new Error(
+        `workflow step '${name}' timed out waiting for ${eventType}`,
+      )
+    }
+    throw new WorkflowSuspended()
   }
 
   async function stepRun(

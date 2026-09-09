@@ -29,6 +29,23 @@ export class FakeEventLog {
     for (const cb of this.subs) cb(full)
     return full
   }
+  listEvents(
+    opts: {
+      runId?: string
+      sinceId?: number
+      types?: Event['type'][]
+      limit?: number
+    } = {},
+  ): Event[] {
+    let list = this.events.filter(
+      (e) =>
+        (!opts.runId || e.runId === opts.runId) &&
+        (opts.sinceId === undefined || e.id > opts.sinceId) &&
+        (!opts.types || opts.types.length === 0 || opts.types.includes(e.type)),
+    )
+    list = list.slice().sort((a, b) => a.id - b.id)
+    return opts.limit ? list.slice(0, opts.limit) : list
+  }
   createRun(
     r: Omit<Run, 'id' | 'status' | 'attempt'> & { attempt?: number },
   ): Run {
