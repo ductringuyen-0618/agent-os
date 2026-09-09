@@ -1,6 +1,7 @@
 import type {
   CreateRunRequest,
   CreateRunResponse,
+  DecisionStatus,
   ErrorResponse,
   HealthResponse,
   KillRunResponse,
@@ -123,6 +124,57 @@ export function buildServer(kernel: Kernel): FastifyInstance {
       } catch (err) {
         reply.code(404)
         return { error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
+
+  app.get('/api/decisions', async (req) => {
+    const { status } = req.query as { status?: DecisionStatus }
+    return kernel.log.listDecisions(status ? { status } : undefined)
+  })
+
+  async function resolveRoute(
+    id: string,
+    target: 'approved' | 'rejected',
+  ): Promise<{ code: number; body: unknown }> {
+    const decision = kernel.log.getDecision(id)
+    if (!decision) return { code: 404, body: { error: 'decision not found' } }
+    if (decision.status !== 'pending') {
+      return {
+        code: 409,
+        body: { error: `decision already ${decision.status}` },
+      }
+    }
+    if (decision.adapter) {
+      await kernel.adapters.applyDecision({ ...decision, status: target })
+    } else {
+      kernel.log.resolveDecision(id, target)
+    }
+    return { code: 200, body: kernel.log.getDecision(id) }
+  }
+
+  app.post('/api/decisions/:id/approve', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const { code, body } = await resolveRoute(id, 'approved')
+    return reply.code(code).send(body)
+  })
+
+  app.post('/api/decisions/:id/reject', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const { code, body } = await resolveRoute(id, 'rejected')
+    return reply.code(code).send(body)
+  })
+
+  app.post<{ Params: { name: string } }>(
+    '/api/projects/:name/sync',
+    async (req, reply) => {
+      const { name } = req.params as { name: string }
+      try {
+        return await kernel.adapters.sync(name)
+      } catch (err) {
+        return reply
+          .code(500)
+          .send({ error: err instanceof Error ? err.message : String(err) })
       }
     },
   )
