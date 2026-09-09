@@ -1,6 +1,9 @@
+import type { SyncResult } from '@agentos/kernel/adapters/types'
 import type {
   CreateRunRequest,
   CreateRunResponse,
+  Decision,
+  DecisionStatus,
   Event,
   HealthResponse,
   RoutineConfig,
@@ -26,7 +29,11 @@ export class ApiClient {
     init: RequestInit = {},
   ): Promise<T> {
     const headers = new Headers(init.headers)
-    headers.set('content-type', 'application/json')
+    // Only set content-type when there's an actual JSON body -- Fastify's
+    // default JSON body parser rejects an empty body when content-type is
+    // application/json (FST_ERR_CTP_EMPTY_JSON_BODY), which every bodyless
+    // POST here (approve/reject/sync/enable/disable) would otherwise hit.
+    if (init.body !== undefined) headers.set('content-type', 'application/json')
     if (this.opts.token)
       headers.set('authorization', `Bearer ${this.opts.token}`)
     const res = await fetch(`${this.opts.baseUrl}${urlPath}`, {
@@ -90,5 +97,21 @@ export class ApiClient {
       `/api/routines/${name}/${enabled ? 'enable' : 'disable'}`,
       { method: 'POST' },
     )
+  }
+
+  listDecisions(status?: DecisionStatus): Promise<Decision[]> {
+    return this.request(`/api/decisions${status ? `?status=${status}` : ''}`)
+  }
+
+  approveDecision(id: string): Promise<Decision> {
+    return this.request(`/api/decisions/${id}/approve`, { method: 'POST' })
+  }
+
+  rejectDecision(id: string): Promise<Decision> {
+    return this.request(`/api/decisions/${id}/reject`, { method: 'POST' })
+  }
+
+  syncProject(name: string): Promise<SyncResult> {
+    return this.request(`/api/projects/${name}/sync`, { method: 'POST' })
   }
 }
