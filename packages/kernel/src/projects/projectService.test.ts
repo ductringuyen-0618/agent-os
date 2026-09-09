@@ -1,6 +1,7 @@
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import { AdapterHost } from '../adapters/adapterHost.js'
@@ -8,7 +9,18 @@ import type { KernelConfig } from '../config.js'
 import { EventLog } from '../log/eventLog.js'
 import { Scheduler } from '../scheduler/scheduler.js'
 import { WikiService } from '../wiki/wikiService.js'
-import { ProjectService, deriveProjectName } from './projectService.js'
+import {
+  ProjectNameCollisionError,
+  ProjectService,
+  deriveProjectName,
+} from './projectService.js'
+
+// Mirrors gh.test.ts's local fakeGhBin constant (not exported from there, so
+// redefined here at the same relative depth: src/projects -> repo root).
+const fakeGhBin = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../../../tools/fake-gh/bin.js',
+)
 
 function makeCfg(osRoot: string): KernelConfig {
   return {
@@ -63,5 +75,151 @@ describe('ProjectService.writeProjectYaml', () => {
     )
     expect(written.clone).toBe('${AGENTOS_CLONES}/widgets')
     expect(written.name).toBe('widgets')
+  })
+})
+
+function seedRoutinesFile(osRoot: string) {
+  writeFileSync(
+    path.join(osRoot, 'routines.yaml'),
+    'defaults:\n  model: sonnet\n  permission_mode: plan\n  allowed_tools: []\n  max_attempts: 2\n  timeout_ms: 600000\nroutines: []\n',
+  )
+}
+
+describe('ProjectService.addProject', () => {
+  it('registers a project: writes yaml, appends the sync routine, hot-registers it, runs the first sync', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    seedRoutinesFile(osRoot)
+    process.env.AGENTOS_GH_BIN = fakeGhBin
+    process.env.FAKE_GH_DEFAULT_BRANCH = 'main'
+
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(cfg.dbPath)
+    const wiki = new WikiService(osRoot, log)
+    const syncCalls: string[] = []
+    const registry = {
+      'techpulse-coo': {
+        name: 'techpulse-coo',
+        sync: async () => {
+          syncCalls.push('sync')
+          return { added: [], changed: [], events: [], hasCooLayout: false }
+        },
+        applyDecision: async () => {},
+      },
+    }
+    const adapters = new AdapterHost(cfg, log, wiki, registry)
+    const scheduler = new Scheduler(cfg, log, async () => {})
+    const service = new ProjectService(cfg, adapters, scheduler, log)
+
+    const result = await service.addProject({ repo: 'octo/widgets' })
+
+    expect(result.project.name).toBe('widgets')
+    expect(result.project.base_branch).toBe('main')
+    expect(result.sync.hasCooLayout).toBe(false)
+    expect(syncCalls).toEqual(['sync'])
+    expect(existsSync(path.join(osRoot, 'projects', 'widgets.yaml'))).toBe(true)
+    const routinesText = readFileSync(
+      path.join(osRoot, 'routines.yaml'),
+      'utf8',
+    )
+    expect(routinesText).toContain('widgets-sync')
+    expect(
+      scheduler.list().some((l) => l.routine.name === 'widgets-sync'),
+    ).toBe(true)
+  })
+
+  it('rejects an invalid repo name before writing anything', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    seedRoutinesFile(osRoot)
+    const { service } = makeService(osRoot)
+    await expect(service.addProject({ repo: 'not-a-repo' })).rejects.toThrow()
+    expect(existsSync(path.join(osRoot, 'projects'))).toBe(false)
+  })
+
+  it('rejects a name collision with 409-worthy error', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    seedRoutinesFile(osRoot)
+    process.env.AGENTOS_GH_BIN = fakeGhBin
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(cfg.dbPath)
+    const wiki = new WikiService(osRoot, log)
+    const registry = {
+      'techpulse-coo': {
+        name: 'techpulse-coo',
+        sync: async () => ({ added: [], changed: [], events: [] }),
+        applyDecision: async () => {},
+      },
+    }
+    const adapters = new AdapterHost(cfg, log, wiki, registry)
+    const scheduler = new Scheduler(cfg, log, async () => {})
+    const service = new ProjectService(cfg, adapters, scheduler, log)
+    await service.addProject({ repo: 'octo/widgets' })
+
+    await expect(service.addProject({ repo: 'other/widgets' })).rejects.toThrow(
+      ProjectNameCollisionError,
+    )
+  })
+
+  it('keeps the written project and returns syncError when the first sync throws', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    seedRoutinesFile(osRoot)
+    process.env.AGENTOS_GH_BIN = fakeGhBin
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(cfg.dbPath)
+    const wiki = new WikiService(osRoot, log)
+    const registry = {
+      'techpulse-coo': {
+        name: 'techpulse-coo',
+        sync: async () => {
+          throw new Error('clone failed')
+        },
+        applyDecision: async () => {},
+      },
+    }
+    const adapters = new AdapterHost(cfg, log, wiki, registry)
+    const scheduler = new Scheduler(cfg, log, async () => {})
+    const service = new ProjectService(cfg, adapters, scheduler, log)
+
+    const result = await service.addProject({ repo: 'octo/widgets' })
+
+    expect(result.syncError).toContain('clone failed')
+    expect(existsSync(path.join(osRoot, 'projects', 'widgets.yaml'))).toBe(true)
+  })
+
+  it('writes a build block with inferred checks when build: true', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    seedRoutinesFile(osRoot)
+    process.env.AGENTOS_GH_BIN = fakeGhBin
+    process.env.FAKE_GH_FILE_FIXTURE = path.join(osRoot, 'package.json.fixture')
+    writeFileSync(
+      process.env.FAKE_GH_FILE_FIXTURE,
+      JSON.stringify({
+        scripts: { typecheck: 'tsc', lint: 'eslint .', test: 'vitest run' },
+      }),
+    )
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(cfg.dbPath)
+    const wiki = new WikiService(osRoot, log)
+    const registry = {
+      'techpulse-coo': {
+        name: 'techpulse-coo',
+        sync: async () => ({ added: [], changed: [], events: [] }),
+        applyDecision: async () => {},
+      },
+    }
+    const adapters = new AdapterHost(cfg, log, wiki, registry)
+    const scheduler = new Scheduler(cfg, log, async () => {})
+    const service = new ProjectService(cfg, adapters, scheduler, log)
+
+    const result = await service.addProject({
+      repo: 'octo/widgets',
+      build: true,
+    })
+
+    expect(result.project.build?.enabled).toBe(true)
+    expect(result.project.build?.checks).toContain(
+      'pnpm -r --if-present typecheck',
+    )
+    expect(result.project.build?.checks).toContain('pnpm -r --if-present lint')
+    expect(result.project.build?.checks).toContain('pnpm -r --if-present test')
   })
 })
