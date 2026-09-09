@@ -36,7 +36,12 @@ async function ensureClone(ctx: AdapterContext): Promise<void> {
     return
   }
   await mkdir(path.dirname(project.clone), { recursive: true })
-  await simpleGit().clone(project.repo, project.clone)
+  // Clone the configured branch explicitly: a remote whose HEAD points at a
+  // different (or unborn) branch would otherwise yield an empty working tree.
+  await simpleGit().clone(project.repo, project.clone, [
+    '--branch',
+    project.base_branch,
+  ])
 }
 
 async function listMdFiles(dir: string): Promise<string[]> {

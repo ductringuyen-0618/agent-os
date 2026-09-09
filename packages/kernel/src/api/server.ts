@@ -60,6 +60,25 @@ async function fileExists(p: string): Promise<boolean> {
 export function buildServer(kernel: Kernel): FastifyInstance {
   const { cfg, log, pm, wiki, scheduler } = kernel
   const app = Fastify({ logger: { level: cfg.logLevel } })
+  // Treat an empty JSON body as `{}` instead of a 400: clients (and `curl -X
+  // POST`) commonly send the content-type header on body-less POSTs like
+  // /api/decisions/:id/approve.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (_req, body, done) => {
+      if (body === '') return done(null, {})
+      try {
+        done(null, JSON.parse(body as string))
+      } catch {
+        const err = new Error('Invalid JSON body') as Error & {
+          statusCode: number
+        }
+        err.statusCode = 400
+        done(err, undefined)
+      }
+    },
+  )
   app.register(fastifyWebsocket)
 
   app.addHook('onRequest', async (req, reply) => {

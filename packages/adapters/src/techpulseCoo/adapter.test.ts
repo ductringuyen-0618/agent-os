@@ -84,6 +84,23 @@ describe('techpulseCooAdapter.sync', () => {
     )
   })
 
+  it('clones base_branch even when the remote HEAD points at another branch', async () => {
+    const { root, bareDir } = await createTempTechpulseRepo()
+    // Point the bare repo's HEAD at an unborn branch, like a bare `git init`
+    // whose default branch never received a push.
+    await (await import('simple-git'))
+      .default(bareDir)
+      .raw(['symbolic-ref', 'HEAD', 'refs/heads/trunk'])
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const freshClone = path.join(root, 'fresh-clone')
+    const ctx = fakeCtx(freshClone, osRoot)
+    ctx.project.repo = bareDir
+
+    const result = await techpulseCooAdapter.sync(ctx)
+
+    expect(result.added).toContain('proposals/001-dark-mode.md')
+  })
+
   it('is a no-op on the second run when nothing changed', async () => {
     const { cloneDir } = await createTempTechpulseRepo()
     const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))

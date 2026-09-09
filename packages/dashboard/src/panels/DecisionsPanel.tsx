@@ -36,11 +36,15 @@ export function DecisionsPanel() {
   }, [load, tab])
 
   function onResolved(updated: Decision) {
-    setDecisions((prev) =>
-      (prev ?? [])
-        .map((d) => (d.id === updated.id ? updated : d))
-        .filter((d) => tab === 'history' || d.status === 'pending'),
-    )
+    setDecisions((prev) => {
+      const list = prev ?? []
+      // A failed optimistic update hands the original decision back after it
+      // was filtered out of the list, so re-insert it rather than dropping it.
+      const next = list.some((d) => d.id === updated.id)
+        ? list.map((d) => (d.id === updated.id ? updated : d))
+        : [updated, ...list]
+      return next.filter((d) => tab === 'history' || d.status === 'pending')
+    })
   }
 
   return (
