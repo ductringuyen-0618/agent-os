@@ -115,4 +115,34 @@ describe('EventLog', () => {
     expect(messages.map((m) => m.body)).toEqual(['second', 'first'])
     expect(messages.every((m) => m.readAt === undefined)).toBe(true)
   })
+
+  it('sums a routine cost for runs started today', () => {
+    const r1 = log.createRun({ routine: 'heartbeat' })
+    log.updateRun(r1.id, {
+      startedAt: new Date().toISOString(),
+      costUsd: 0.1,
+    })
+    const r2 = log.createRun({ routine: 'heartbeat' })
+    log.updateRun(r2.id, {
+      startedAt: new Date().toISOString(),
+      costUsd: 0.25,
+    })
+    // A different routine's spend must not bleed into this one's total.
+    const other = log.createRun({ routine: 'lint' })
+    log.updateRun(other.id, { startedAt: new Date().toISOString(), costUsd: 5 })
+    expect(log.costForRoutineToday('heartbeat')).toBeCloseTo(0.35)
+  })
+
+  it('excludes runs from before today when summing a routine cost', () => {
+    const run = log.createRun({ routine: 'heartbeat' })
+    log.updateRun(run.id, {
+      startedAt: '2020-01-01T00:00:00.000Z',
+      costUsd: 9,
+    })
+    expect(log.costForRoutineToday('heartbeat')).toBe(0)
+  })
+
+  it('reports zero cost for a routine with no runs yet', () => {
+    expect(log.costForRoutineToday('unknown-routine')).toBe(0)
+  })
 })

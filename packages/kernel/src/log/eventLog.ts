@@ -393,6 +393,18 @@ export class EventLog {
     return rows.map(rowToMessage)
   }
 
+  /** Sum of cost_usd for a routine's runs that started since UTC midnight today. */
+  costForRoutineToday(routine: string): number {
+    const row = this.db
+      .prepare(
+        `SELECT COALESCE(SUM(cost_usd), 0) as total FROM runs
+         WHERE routine = ? AND cost_usd IS NOT NULL AND started_at IS NOT NULL
+         AND started_at >= strftime('%Y-%m-%dT00:00:00.000Z', 'now')`,
+      )
+      .get(routine) as { total: number }
+    return row.total
+  }
+
   createRunToken(runId: string, token: string): void {
     this.db
       .prepare('INSERT INTO run_tokens (run_id, token) VALUES (?, ?)')

@@ -19,4 +19,43 @@ describe('RoutinesPanel', () => {
     )
     expect(run).toHaveBeenCalled()
   })
+
+  it('shows the spend-vs-cap chip only for a routine with a budget configured', async () => {
+    installMockFetch({
+      'GET /api/routines': () => [
+        {
+          routine: { name: 'heartbeat', every: '30m' },
+          dailyBudgetUsd: 1,
+          spentTodayUsd: 0.42,
+        },
+        { routine: { name: 'ingest', on: ['raw.added'] } },
+      ],
+    })
+    render(
+      <ToastProvider>
+        <RoutinesPanel />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('$0.42 / $1.00')).toBeInTheDocument()
+    expect(screen.queryByText('budget hit')).not.toBeInTheDocument()
+  })
+
+  it('shows a budget hit chip once a routine has tripped its cap', async () => {
+    installMockFetch({
+      'GET /api/routines': () => [
+        {
+          routine: { name: 'heartbeat', every: '30m' },
+          dailyBudgetUsd: 1,
+          spentTodayUsd: 1.2,
+          budgetTripped: true,
+        },
+      ],
+    })
+    render(
+      <ToastProvider>
+        <RoutinesPanel />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('budget hit')).toBeInTheDocument()
+  })
 })
