@@ -15,6 +15,7 @@ export interface SyncResult {
   added: string[]
   changed: string[]
   events: EventType[]
+  hasCooLayout?: boolean
 }
 
 export interface ProjectAdapter {

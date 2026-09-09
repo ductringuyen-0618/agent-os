@@ -148,6 +148,15 @@ export const RoutinesFileSchema = z.object({
   routines: z.array(RoutineConfigSchema),
 })
 
+export const ProjectBuildConfigSchema = z.object({
+  enabled: z.boolean(),
+  model: z.string(),
+  permission_mode: PermissionModeSchema,
+  allowed_tools: z.array(z.string()),
+  checks: z.array(z.string()),
+  timeout_ms: z.number().int(),
+})
+
 export const ProjectConfigSchema = z.object({
   name: z.string(),
   adapter: z.string(),
@@ -155,6 +164,7 @@ export const ProjectConfigSchema = z.object({
   clone: z.string(),
   base_branch: z.string(),
   options: z.record(z.unknown()),
+  build: ProjectBuildConfigSchema.optional(),
 })
 
 export const EvalCriteriaSchema = z.object({

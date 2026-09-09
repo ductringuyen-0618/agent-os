@@ -231,3 +231,31 @@ describe('techpulseCooAdapter.sync keeps pending decisions current', () => {
     expect(decisions[0].body).toContain('## What you get')
   })
 })
+
+describe('techpulseCooAdapter.sync — hasCooLayout', () => {
+  it('reports hasCooLayout: false when the proposals dir is absent', async () => {
+    const { cloneDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+    ctx.project.options = {
+      ...ctx.project.options,
+      proposals_path: 'docs/missions/coo/proposals-does-not-exist',
+      reports_path: 'docs/missions/coo/reports',
+      state_path: 'docs/missions/coo/state.md',
+    }
+
+    const result = await techpulseCooAdapter.sync(ctx)
+
+    expect(result.hasCooLayout).toBe(false)
+  })
+
+  it('reports hasCooLayout: true when the proposals dir exists', async () => {
+    const { cloneDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+
+    const result = await techpulseCooAdapter.sync(ctx)
+
+    expect(result.hasCooLayout).toBe(true)
+  })
+})
