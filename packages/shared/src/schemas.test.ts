@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest'
 import {
   DecisionSchema,
   EvalCriteriaSchema,
@@ -9,125 +9,125 @@ import {
   RoutinesFileSchema,
   RunSchema,
   parseRoutinesFile,
-} from "./schemas.js";
+} from './schemas.js'
 
-describe("RunSchema", () => {
-  it("accepts a minimal run", () => {
+describe('RunSchema', () => {
+  it('accepts a minimal run', () => {
     expect(() =>
       RunSchema.parse({
-        id: "r1",
-        routine: "heartbeat",
-        status: "queued",
+        id: 'r1',
+        routine: 'heartbeat',
+        status: 'queued',
         attempt: 1,
       }),
-    ).not.toThrow();
-  });
-  it("rejects an unknown status", () => {
+    ).not.toThrow()
+  })
+  it('rejects an unknown status', () => {
     expect(() =>
       RunSchema.parse({
-        id: "r1",
-        routine: "heartbeat",
-        status: "nope",
+        id: 'r1',
+        routine: 'heartbeat',
+        status: 'nope',
         attempt: 1,
       }),
-    ).toThrow();
-  });
-});
+    ).toThrow()
+  })
+})
 
-describe("EventSchema", () => {
-  it("accepts a built-in event type", () => {
+describe('EventSchema', () => {
+  it('accepts a built-in event type', () => {
     expect(() =>
       EventSchema.parse({
         id: 1,
-        ts: "2026-09-08T00:00:00.000Z",
-        type: "run.started",
+        ts: '2026-09-08T00:00:00.000Z',
+        type: 'run.started',
         payload: {},
       }),
-    ).not.toThrow();
-  });
-  it("accepts a custom.* event type", () => {
+    ).not.toThrow()
+  })
+  it('accepts a custom.* event type', () => {
     expect(() =>
       EventSchema.parse({
         id: 1,
-        ts: "2026-09-08T00:00:00.000Z",
-        type: "custom.my-thing",
+        ts: '2026-09-08T00:00:00.000Z',
+        type: 'custom.my-thing',
         payload: {},
       }),
-    ).not.toThrow();
-  });
-  it("rejects an event type that is neither built-in nor custom.*", () => {
+    ).not.toThrow()
+  })
+  it('rejects an event type that is neither built-in nor custom.*', () => {
     expect(() =>
       EventSchema.parse({
         id: 1,
-        ts: "2026-09-08T00:00:00.000Z",
-        type: "bogus.event",
+        ts: '2026-09-08T00:00:00.000Z',
+        type: 'bogus.event',
         payload: {},
       }),
-    ).toThrow();
-  });
-});
+    ).toThrow()
+  })
+})
 
-describe("DecisionSchema / MessageSchema / ProjectConfigSchema / EvalCriteriaSchema", () => {
-  it("accept valid shapes", () => {
+describe('DecisionSchema / MessageSchema / ProjectConfigSchema / EvalCriteriaSchema', () => {
+  it('accept valid shapes', () => {
     expect(() =>
       DecisionSchema.parse({
-        id: "d1",
-        title: "t",
-        body: "b",
-        status: "pending",
-        createdAt: "2026-09-08T00:00:00.000Z",
+        id: 'd1',
+        title: 't',
+        body: 'b',
+        status: 'pending',
+        createdAt: '2026-09-08T00:00:00.000Z',
       }),
-    ).not.toThrow();
+    ).not.toThrow()
     expect(() =>
       MessageSchema.parse({
-        id: "m1",
-        from: "ops",
-        to: "librarian",
-        body: "hi",
-        ts: "2026-09-08T00:00:00.000Z",
+        id: 'm1',
+        from: 'ops',
+        to: 'librarian',
+        body: 'hi',
+        ts: '2026-09-08T00:00:00.000Z',
       }),
-    ).not.toThrow();
+    ).not.toThrow()
     expect(() =>
       ProjectConfigSchema.parse({
-        name: "techpulse",
-        adapter: "techpulse-coo",
-        repo: "x",
-        clone: "y",
-        base_branch: "main",
+        name: 'techpulse',
+        adapter: 'techpulse-coo',
+        repo: 'x',
+        clone: 'y',
+        base_branch: 'main',
         options: {},
       }),
-    ).not.toThrow();
+    ).not.toThrow()
     expect(() =>
       EvalCriteriaSchema.parse({
-        criteria: [{ key: "accuracy", weight: 1, description: "d" }],
+        criteria: [{ key: 'accuracy', weight: 1, description: 'd' }],
       }),
-    ).not.toThrow();
-  });
-});
+    ).not.toThrow()
+  })
+})
 
-describe("RoutineConfigSchema", () => {
-  it("accepts a routine with exactly one trigger", () => {
+describe('RoutineConfigSchema', () => {
+  it('accepts a routine with exactly one trigger', () => {
     expect(() =>
-      RoutineConfigSchema.parse({ name: "heartbeat", every: "30m" }),
-    ).not.toThrow();
-  });
-  it("accepts a manual-only routine with no trigger", () => {
+      RoutineConfigSchema.parse({ name: 'heartbeat', every: '30m' }),
+    ).not.toThrow()
+  })
+  it('accepts a manual-only routine with no trigger', () => {
     expect(() =>
-      RoutineConfigSchema.parse({ name: "daily-digest" }),
-    ).not.toThrow();
-  });
-  it("rejects a routine with two triggers set", () => {
+      RoutineConfigSchema.parse({ name: 'daily-digest' }),
+    ).not.toThrow()
+  })
+  it('rejects a routine with two triggers set', () => {
     expect(() =>
       RoutineConfigSchema.parse({
-        name: "bad",
-        every: "30m",
-        cron: "0 3 * * *",
+        name: 'bad',
+        every: '30m',
+        cron: '0 3 * * *',
       }),
-    ).toThrow();
-  });
-});
+    ).toThrow()
+  })
+})
 
-describe("parseRoutinesFile", () => {
+describe('parseRoutinesFile', () => {
   const yamlText = `
 defaults:
   model: sonnet
@@ -141,22 +141,22 @@ routines:
     skill: heartbeat
     agent: ops
     model: haiku
-`;
-  it("parses valid YAML into a RoutinesFile", () => {
-    const parsed = parseRoutinesFile(yamlText);
-    expect(parsed.defaults.model).toBe("sonnet");
-    expect(parsed.routines).toHaveLength(1);
-    expect(parsed.routines[0].name).toBe("heartbeat");
-  });
-  it("throws a ZodError on invalid YAML", () => {
+`
+  it('parses valid YAML into a RoutinesFile', () => {
+    const parsed = parseRoutinesFile(yamlText)
+    expect(parsed.defaults.model).toBe('sonnet')
+    expect(parsed.routines).toHaveLength(1)
+    expect(parsed.routines[0].name).toBe('heartbeat')
+  })
+  it('throws a ZodError on invalid YAML', () => {
     expect(() =>
       parseRoutinesFile('defaults: {}\nroutines: "not-an-array"'),
-    ).toThrow();
-  });
-});
+    ).toThrow()
+  })
+})
 
-describe("RoutinesFileSchema", () => {
-  it("is used by parseRoutinesFile and is independently importable", () => {
-    expect(RoutinesFileSchema).toBeDefined();
-  });
-});
+describe('RoutinesFileSchema', () => {
+  it('is used by parseRoutinesFile and is independently importable', () => {
+    expect(RoutinesFileSchema).toBeDefined()
+  })
+})
