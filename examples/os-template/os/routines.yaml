@@ -1,0 +1,13 @@
+defaults:
+  model: sonnet
+  permission_mode: plan
+  allowed_tools: [Read, Glob, Grep, WebFetch, WebSearch]
+  max_attempts: 2
+  timeout_ms: 300000
+
+routines:
+  - name: heartbeat
+    every: 30m
+    skill: heartbeat
+    agent: ops
+    model: haiku
