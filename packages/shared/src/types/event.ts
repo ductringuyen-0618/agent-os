@@ -10,6 +10,7 @@ export type EventType =
   | 'raw.changed'
   | 'proposal.changed'
   | 'decision.created'
+  | 'decision.updated'
   | 'decision.resolved'
   | 'message.sent'
   | 'wiki.written'

@@ -146,3 +146,45 @@ describe('AdapterHost.sync / applyDecision — Run lifecycle', () => {
     expect(runs[0].status).toBe('success')
   })
 })
+
+describe('AdapterHost.applyDecision — project routing', () => {
+  it('routes by the decision project when several projects share an adapter', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    mkdirSync(path.join(osRoot, 'projects'), { recursive: true })
+    for (const name of ['alpha', 'beta']) {
+      writeFileSync(
+        path.join(osRoot, 'projects', `${name}.yaml`),
+        `name: ${name}\nadapter: techpulse-coo\nrepo: x\nclone: /tmp/${name}\nbase_branch: main\noptions: {}\n`,
+      )
+    }
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(cfg.dbPath)
+    const wiki = new WikiService(osRoot, log)
+    const seen: string[] = []
+    const registry = {
+      'techpulse-coo': {
+        name: 'techpulse-coo',
+        sync: async () => ({ added: [], changed: [], events: [] }),
+        // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for Decision/AdapterContext
+        applyDecision: async (_d: any, ctx: any) => {
+          seen.push(ctx.project.name)
+        },
+      },
+    }
+    const host = new AdapterHost(cfg, log, wiki, registry)
+    const decision = log.createDecision({
+      title: 't',
+      body: 'b',
+      adapter: 'techpulse-coo',
+      project: 'beta',
+      ref: '001.md',
+    })
+
+    await host.applyDecision({ ...decision, status: 'approved' })
+    expect(seen).toEqual(['beta'])
+
+    await expect(
+      host.applyDecision({ ...decision, project: 'gamma', status: 'approved' }),
+    ).rejects.toThrow(/no project named 'gamma'/)
+  })
+})

@@ -5,6 +5,8 @@ export interface Decision {
   title: string
   body: string
   adapter?: string
+  /** Project the decision belongs to (os/projects/<name>.yaml), when adapter-raised. */
+  project?: string
   ref?: string
   status: DecisionStatus
   createdByRun?: string

@@ -202,7 +202,8 @@ export function buildServer(kernel: Kernel): FastifyInstance {
   ): Promise<{ code: number; body: unknown }> {
     const decision = kernel.log.getDecision(id)
     if (!decision) return { code: 404, body: { error: 'decision not found' } }
-    if (decision.status !== 'pending') {
+    // An errored decision was never applied, so it may be tried again.
+    if (decision.status !== 'pending' && decision.status !== 'error') {
       return {
         code: 409,
         body: { error: `decision already ${decision.status}` },

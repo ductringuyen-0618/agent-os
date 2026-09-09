@@ -122,9 +122,23 @@ export class AdapterHost {
       throw new Error(`decision ${decision.id} has no adapter`)
     }
     const projects = await this.loadProjects()
-    const project = projects.find((p) => p.adapter === decision.adapter)
+    // Several projects can share one adapter type, so the decision's own
+    // project wins; the adapter-only match is for rows created before
+    // decisions recorded their project.
+    const project = decision.project
+      ? projects.find((p) => p.name === decision.project)
+      : projects.find((p) => p.adapter === decision.adapter)
     if (!project) {
-      throw new Error(`no project configured for adapter '${decision.adapter}'`)
+      throw new Error(
+        decision.project
+          ? `no project named '${decision.project}' is configured`
+          : `no project configured for adapter '${decision.adapter}'`,
+      )
+    }
+    if (project.adapter !== decision.adapter) {
+      throw new Error(
+        `decision ${decision.id} is for adapter '${decision.adapter}' but project '${project.name}' uses '${project.adapter}'`,
+      )
     }
     const adapter = this.getAdapter(project)
 

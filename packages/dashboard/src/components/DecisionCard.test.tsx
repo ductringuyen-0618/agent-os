@@ -99,7 +99,64 @@ describe('DecisionCard', () => {
   })
 })
 
-describe('DecisionCard summary', () => {
+describe('DecisionCard compact brief', () => {
+  it('shows what and why-now lines from the proposal sections', () => {
+    installMockFetch()
+    render(
+      <ToastProvider>
+        <DecisionCard
+          decision={{
+            ...fixtures.decision,
+            body: [
+              '## What you get',
+              'A cap.',
+              '',
+              '## Why start this now',
+              'Spend is invisible.',
+              '',
+              '## Effort estimate',
+              'S — tiny.',
+            ].join('\n'),
+          }}
+          onResolved={() => {}}
+          variant="compact"
+        />
+      </ToastProvider>,
+    )
+    expect(screen.getByText('A cap.')).toBeInTheDocument()
+    expect(screen.getByText('Spend is invisible.')).toBeInTheDocument()
+    expect(screen.getByTitle('Effort estimate')).toHaveTextContent('S')
+  })
+
+  it('labels the card with the project, falling back to the adapter', () => {
+    installMockFetch()
+    const { rerender } = render(
+      <ToastProvider>
+        <DecisionCard
+          decision={{
+            ...fixtures.decision,
+            adapter: 'techpulse-coo',
+            project: 'agent-os',
+          }}
+          onResolved={() => {}}
+          variant="compact"
+        />
+      </ToastProvider>,
+    )
+    expect(screen.getByText(/agent-os,/)).toBeInTheDocument()
+    expect(screen.queryByText(/techpulse-coo/)).not.toBeInTheDocument()
+    rerender(
+      <ToastProvider>
+        <DecisionCard
+          decision={{ ...fixtures.decision, adapter: 'techpulse-coo' }}
+          onResolved={() => {}}
+          variant="compact"
+        />
+      </ToastProvider>,
+    )
+    expect(screen.getByText(/techpulse-coo,/)).toBeInTheDocument()
+  })
+
   it('strips list markers from the first body line', () => {
     installMockFetch()
     render(

@@ -44,6 +44,12 @@ function fakeCtx(clone: string, osRoot: string): AdapterContext {
       },
       listDecisions: () => decisions,
       // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for EventLog
+      updateDecision: (id: string, patch: any) => {
+        const d = decisions.find((x) => x.id === id)
+        if (d) Object.assign(d, patch)
+        return d
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for EventLog
     } as any,
     // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for WikiService
     wiki: {} as any,
@@ -131,6 +137,9 @@ describe('techpulseCooAdapter.sync — decisions', () => {
     })
     expect(decisions[0].body).toContain('Why this increases engagement')
     expect(decisions[0].body).toContain('Effort estimate')
+    expect(decisions[0].body).toContain('# Add dark mode toggle')
+    expect(decisions[0].project).toBe('techpulse')
+    expect(decisions[0].body).not.toMatch(/^---/)
   })
 
   it('raises the decision for a proposal an earlier crashed sync had already mirrored', async () => {
@@ -189,5 +198,36 @@ describe('techpulseCooAdapter.sync — decisions', () => {
 
     const result = await techpulseCooAdapter.sync(ctx)
     expect(result.events).toContain('proposal.changed')
+  })
+})
+
+describe('techpulseCooAdapter.sync keeps pending decisions current', () => {
+  it('rewrites a pending decision when its proposal is edited', async () => {
+    const { cloneDir, seedDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+    await techpulseCooAdapter.sync(ctx)
+
+    const seedGit = (await import('simple-git')).default(seedDir)
+    const proposalPath = path.join(
+      seedDir,
+      'docs/missions/coo/proposals/001-dark-mode.md',
+    )
+    writeFileSync(
+      proposalPath,
+      readFileSync(proposalPath, 'utf8').replace(
+        '## Why this increases engagement',
+        '## What you get\nA toggle.\n\n## Why this increases engagement',
+      ),
+    )
+    await seedGit.add('.')
+    await seedGit.commit('add brief')
+    await seedGit.push('origin', 'main')
+
+    await techpulseCooAdapter.sync(ctx)
+    // biome-ignore lint/suspicious/noExplicitAny: fakeCtx's log stub exposes listDecisions beyond the AdapterContext type
+    const decisions = (ctx.log as any).listDecisions()
+    expect(decisions).toHaveLength(1)
+    expect(decisions[0].body).toContain('## What you get')
   })
 })
