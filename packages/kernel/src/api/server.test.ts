@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadKernelConfig } from '../config.js'
+import { createKernel } from '../kernel.js'
 import type { Kernel } from '../kernel.js'
 import { EventLog } from '../log/eventLog.js'
 import { ProcessManager } from '../process/processManager.js'
@@ -45,9 +46,26 @@ describe('api/server runs routes', () => {
       path.join(osRoot, 'CLAUDE.md'),
       '# agent-os instance schema',
     )
+    await fsp.writeFile(
+      path.join(osRoot, 'routines.yaml'),
+      [
+        'defaults:',
+        '  model: sonnet',
+        '  permission_mode: plan',
+        '  allowed_tools: [Read]',
+        '  max_attempts: 1',
+        '  timeout_ms: 5000',
+        'routines: []',
+        '',
+      ].join('\n'),
+    )
     process.env.FAKE_CLAUDE_FIXTURE = path.join(
       fixturesDir,
       'init-success.jsonl',
+    )
+    process.env.FAKE_CLAUDE_WRAPUP_FIXTURE = path.join(
+      fixturesDir,
+      'wrapup-success.jsonl',
     )
     log = new EventLog(path.join(tmpDir, '.agentos', 'agentos.db'))
   })
@@ -57,6 +75,8 @@ describe('api/server runs routes', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
     // biome-ignore lint/performance/noDelete: assigning undefined would stringify to "undefined"
     delete process.env.FAKE_CLAUDE_FIXTURE
+    // biome-ignore lint/performance/noDelete: assigning undefined would stringify to "undefined"
+    delete process.env.FAKE_CLAUDE_WRAPUP_FIXTURE
   })
 
   it('reports health', async () => {
@@ -78,8 +98,8 @@ describe('api/server runs routes', () => {
       runtimeDir: path.join(tmpDir, '.agentos'),
       dbPath: path.join(tmpDir, '.agentos', 'agentos.db'),
     })
-    const pm = new ProcessManager(cfg, log)
-    const app = buildServer({ cfg, log, pm } as unknown as Kernel)
+    const kernel = createKernel(cfg)
+    const app = buildServer(kernel)
 
     const created = await app.inject({
       method: 'POST',
@@ -90,13 +110,20 @@ describe('api/server runs routes', () => {
     const { runId } = created.json() as { runId: string }
     expect(runId).toBeTruthy()
 
-    await new Promise((resolve) => setTimeout(resolve, 300))
-
-    const runRes = await app.inject({
-      method: 'GET',
-      url: `/api/runs/${runId}`,
-    })
-    expect(runRes.json().status).toBe('success')
+    // Now goes through the Scheduler's runToCompletion (main turn + a
+    // kernel-driven wrap-up turn, i.e. two real fake-claude subprocess
+    // spawns), which can take longer than a single fixed sleep under
+    // parallel-suite CPU contention -- poll until the run reaches a
+    // terminal status instead of guessing a sleep duration.
+    const terminal = new Set(['success', 'failed', 'killed'])
+    let runRes: Awaited<ReturnType<typeof app.inject>> | undefined
+    for (let i = 0; i < 40; i++) {
+      runRes = await app.inject({ method: 'GET', url: `/api/runs/${runId}` })
+      if (terminal.has(runRes.json().status)) break
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    // biome-ignore lint/style/noNonNullAssertion: the loop above always assigns at least once
+    expect(runRes!.json().status).toBe('success')
 
     const eventsRes = await app.inject({
       method: 'GET',
@@ -109,6 +136,7 @@ describe('api/server runs routes', () => {
     expect((listRes.json() as unknown[]).length).toBeGreaterThan(0)
 
     await app.close()
+    await kernel.stop()
   })
 
   it('rejects requests without a skill', async () => {

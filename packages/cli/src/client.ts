@@ -3,8 +3,15 @@ import type {
   CreateRunResponse,
   Event,
   HealthResponse,
+  RoutineConfig,
   Run,
 } from '@agentos/shared'
+
+export interface RoutineListItem {
+  routine: RoutineConfig
+  nextRun?: string
+  lastRun?: Run
+}
 
 export interface ApiClientOptions {
   baseUrl: string
@@ -62,5 +69,26 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(body),
     })
+  }
+
+  listRoutines(): Promise<RoutineListItem[]> {
+    return this.request('/api/routines')
+  }
+
+  runRoutine(
+    name: string,
+    payload?: Record<string, unknown>,
+  ): Promise<{ runId: string }> {
+    return this.request(`/api/routines/${name}/run`, {
+      method: 'POST',
+      body: JSON.stringify({ payload }),
+    })
+  }
+
+  setRoutineEnabled(name: string, enabled: boolean): Promise<{ ok: boolean }> {
+    return this.request(
+      `/api/routines/${name}/${enabled ? 'enable' : 'disable'}`,
+      { method: 'POST' },
+    )
   }
 }
