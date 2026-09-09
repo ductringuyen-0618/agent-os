@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","session_id":"sess-error","model":"claude-sonnet-5"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Attempting task..."}]},"session_id":"sess-error"}
+{"type":"result","subtype":"error_during_execution","session_id":"sess-error","is_error":true,"result":"simulated failure"}
