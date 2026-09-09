@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --out-dir dist && node -e \"require('fs').copyFileSync('src/log/schema.sql','dist/schema.sql')\"",
+    "build": "tsup src/index.ts --format esm --dts --out-dir dist && tsup src/syscall/bin.ts --format esm --out-dir dist/syscall --clean=false && node -e \"require('fs').copyFileSync('src/log/schema.sql','dist/schema.sql')\"",
     "test": "vitest run"
   },
   "dependencies": {

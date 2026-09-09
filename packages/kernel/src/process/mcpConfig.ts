@@ -11,7 +11,12 @@ export async function writeRunMcpConfig(
 ): Promise<string> {
   const runDir = path.join(runtimeDir, 'runs', run.id)
   await fs.mkdir(runDir, { recursive: true })
-  const binPath = path.resolve(import.meta.dirname, '..', 'syscall', 'bin.js')
+  // kernel's build bundles src/index.ts into dist/index.js (single-entry
+  // tsup) and separately bundles src/syscall/bin.ts into dist/syscall/bin.js
+  // (see packages/kernel package.json's build script) — so at runtime
+  // import.meta.dirname here is dist/, and the syscall entry is a sibling
+  // subdirectory of it, not of src/.
+  const binPath = path.resolve(import.meta.dirname, 'syscall', 'bin.js')
   const mcpConfig = {
     mcpServers: {
       // `agentos` is spread last so a routine's extra_mcp can never shadow
