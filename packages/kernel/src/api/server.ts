@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,9 +18,25 @@ import { registerInternalRoutes } from './internal.js'
 
 const VERSION = '0.1.0'
 
+// Walk up from this file to the nearest package.json (packages/kernel/) so
+// this resolves correctly both under the bundled dist/index.js (tsup
+// flattens src/api/server.ts's directory nesting away) and under vitest,
+// which runs the unbundled src/api/server.ts directly -- those two are not
+// the same depth relative to the package root, so a fixed '../' count
+// works for exactly one of them.
+function findPackageRoot(startFile: string): string {
+  let dir = path.dirname(startFile)
+  while (!existsSync(path.join(dir, 'package.json'))) {
+    const parent = path.dirname(dir)
+    if (parent === dir) throw new Error('package.json not found')
+    dir = parent
+  }
+  return dir
+}
+
 const dashboardDist = path.resolve(
-  fileURLToPath(import.meta.url),
-  '../../../../dashboard/dist',
+  findPackageRoot(fileURLToPath(import.meta.url)),
+  '../dashboard/dist',
 )
 
 async function listSubdirs(dir: string): Promise<string[]> {
