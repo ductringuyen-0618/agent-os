@@ -1,3 +1,4 @@
+import type { Message } from '@agentos/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { ApiClient, ApiError } from '../api/client'
 import { useEvents } from '../api/ws'
@@ -10,9 +11,7 @@ const client = new ApiClient()
 const LIMIT = 100
 
 export function MessagesPanel() {
-  const [messages, setMessages] = useState<
-    Awaited<ReturnType<typeof client.messages>> | null
-  >(null)
+  const [messages, setMessages] = useState<Message[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { events } = useEvents((e) => e.type === 'message.sent')
 
@@ -22,9 +21,7 @@ export function MessagesPanel() {
       .messages(LIMIT)
       .then(setMessages)
       .catch((e) =>
-        setError(
-          e instanceof ApiError ? e.message : 'Failed to load messages',
-        ),
+        setError(e instanceof ApiError ? e.message : 'Failed to load messages'),
       )
   }, [])
 
@@ -61,10 +58,7 @@ export function MessagesPanel() {
           </thead>
           <tbody>
             {messages.map((m) => (
-              <tr
-                key={m.id}
-                className="border-t border-border/60 align-top"
-              >
+              <tr key={m.id} className="border-t border-border/60 align-top">
                 <td className="py-2 whitespace-nowrap">
                   <span
                     aria-label={m.readAt ? 'read' : 'unread'}
