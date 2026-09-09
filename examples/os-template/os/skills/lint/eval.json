@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "key": "produced_report",
+      "weight": 0.3,
+      "description": "Wrote lint-report.md via remember."
+    },
+    {
+      "key": "fixed_findings",
+      "weight": 0.4,
+      "description": "Findings that were fixable were actually fixed via remember, not just reported."
+    },
+    {
+      "key": "no_regressions",
+      "weight": 0.3,
+      "description": "No previously-correct page was made incorrect by a lint edit."
+    }
+  ]
+}
