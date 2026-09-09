@@ -43,7 +43,7 @@ function fakeCtx(
       // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for WikiService
       wiki: wiki as any,
       project: {
-        name: 'techpulse',
+        name: 'sandbox',
         adapter: 'techpulse-coo',
         repo: 'unused',
         clone,
@@ -93,7 +93,7 @@ describe('techpulseCooAdapter.applyDecision', () => {
     expect(events.some((e) => e.type === 'git.push')).toBe(true)
     expect(wikiWrites).toHaveLength(1)
     expect(wikiWrites[0].path).toBe(
-      'projects/techpulse/proposals/001-dark-mode.md',
+      'projects/sandbox/proposals/001-dark-mode.md',
     )
 
     // A fixed path.join(osRoot, '..', 'verify') always resolves to the same

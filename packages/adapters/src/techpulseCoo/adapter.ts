@@ -249,7 +249,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
       )
 
       await ctx.wiki.writePage({
-        path: `projects/techpulse/proposals/${slug}.md`,
+        path: `projects/${ctx.project.name}/proposals/${slug}.md`,
         content: `# ${slug}\n\nStatus: ${targetStatus}\n\nDecision ${decision.id} resolved as ${targetStatus} (commit ${commitResult.commit}).\n`,
         op: 'decision',
         runId: ctx.runId,
