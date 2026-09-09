@@ -63,7 +63,8 @@ nothing else.
   operations reuse the local `gh` CLI login rather than a stored token.
 - `.gitleaks.toml` defines the ruleset that catches anything that slips
   past `remember` before it reaches a commit; CI runs the official
-  gitleaks action as a check on every push.
+  gitleaks action on every push to `main`, every `v*` tag, and every
+  pull request into `main`.
 
 ## Local secret scanning
 This repo does not ship an automated pre-commit hook. Before committing,
@@ -74,8 +75,9 @@ gitleaks protect --staged --config .gitleaks.toml
 ```
 
 CI runs the same `.gitleaks.toml` ruleset via the official gitleaks
-action on every push, so anything missed locally is still caught before
-it can land on `main`.
+action on every push to `main`, every `v*` tag, and every pull request
+into `main` (see `.github/workflows/ci.yml`), so anything missed
+locally on one of those paths is still caught before it lands.
 
 ## The approval boundary
 An adapter's `applyDecision` (e.g. flipping a TechPulse proposal's

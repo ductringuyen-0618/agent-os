@@ -3,11 +3,24 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = path.resolve(__dirname, '..')
+// Scope is deliberately the *shipped* surface: the public template, every
+// package's source and tests, and the user-facing docs a real contributor
+// or instance operator reads. It excludes docs/superpowers/** on purpose --
+// that tree is this project's own SDD build ledger, a factual record of the
+// sandbox this was built in (worktree/container paths and all), not product
+// documentation, so it's expected to contain machine-specific paths.
 const SCAN_DIRS = [
   path.join(ROOT, 'examples'),
-  ...['shared', 'kernel', 'cli', 'dashboard', 'adapters'].map((p) =>
+  ...['shared', 'kernel', 'cli', 'dashboard', 'adapters'].flatMap((p) => [
     path.join(ROOT, 'packages', p, 'src'),
-  ),
+    path.join(ROOT, 'packages', p, 'test'),
+  ]),
+]
+const SCAN_FILES = [
+  path.join(ROOT, 'README.md'),
+  path.join(ROOT, 'docs', 'SECURITY.md'),
+  path.join(ROOT, 'docs', 'DEMO.md'),
+  path.join(ROOT, 'docs', 'PRIVATE_INSTANCE.md'),
 ]
 
 const TEXT_EXT = new Set([
@@ -55,7 +68,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe('no secrets or machine paths committed', () => {
-  const files = SCAN_DIRS.flatMap((d) => walk(d))
+  const files = [...SCAN_DIRS.flatMap((d) => walk(d)), ...SCAN_FILES]
 
   it('scanned at least one file', () => {
     expect(files.length).toBeGreaterThan(0)

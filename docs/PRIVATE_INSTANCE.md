@@ -59,7 +59,7 @@ runs unattended at every logon.
 
 ```bat
 schtasks /Create /TN "agent-os daemon" /SC ONLOGON ^
-  /TR "node C:\path\to\agent-os\packages\cli\dist\bin.js up --root C:\path\to\my-agent-os\os" ^
+  /TR "node <path-to-agent-os>\packages\cli\dist\bin.js up --root <path-to-my-agent-os>\os" ^
   /RL LIMITED
 ```
 
