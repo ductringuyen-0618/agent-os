@@ -69,4 +69,17 @@ describe('ApiClient — projects', () => {
     const result = await client.removeProject('widgets')
     expect(result.ok).toBe(true)
   })
+
+  it('syncs a project', async () => {
+    installMockFetch({
+      'POST /api/projects/techpulse/sync': () => ({
+        added: [],
+        changed: ['os/wiki/index.md'],
+        events: [],
+      }),
+    })
+    const client = new ApiClient()
+    const result = await client.syncProject('techpulse')
+    expect(result.changed).toEqual(['os/wiki/index.md'])
+  })
 })

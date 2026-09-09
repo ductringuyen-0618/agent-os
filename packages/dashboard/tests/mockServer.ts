@@ -125,6 +125,7 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
       sync: { added: [], changed: [], events: [], hasCooLayout: false },
     }),
     'DELETE /api/projects/widgets': () => ({ ok: true }),
+    'DELETE /api/projects/techpulse': () => ({ ok: true }),
     ...overrides,
   }
   vi.stubGlobal(

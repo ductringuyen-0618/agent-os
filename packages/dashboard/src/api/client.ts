@@ -189,4 +189,10 @@ export class ApiClient {
   removeProject(name: string) {
     return this.req<{ ok: true }>('DELETE', `/api/projects/${name}`)
   }
+  syncProject(name: string) {
+    return this.req<{ added: string[]; changed: string[]; events: string[] }>(
+      'POST',
+      `/api/projects/${name}/sync`,
+    )
+  }
 }
