@@ -1,11 +1,14 @@
 import type { SyncResult } from '@agentos/kernel/adapters/types'
 import type {
+  AddProjectRequest,
+  AddProjectResponse,
   CreateRunRequest,
   CreateRunResponse,
   Decision,
   DecisionStatus,
   Event,
   HealthResponse,
+  ProjectListItem,
   RoutineConfig,
   Run,
 } from '@agentos/shared'
@@ -113,5 +116,16 @@ export class ApiClient {
 
   syncProject(name: string): Promise<SyncResult> {
     return this.request(`/api/projects/${name}/sync`, { method: 'POST' })
+  }
+
+  listProjects(): Promise<ProjectListItem[]> {
+    return this.request('/api/projects')
+  }
+
+  addProject(input: AddProjectRequest): Promise<AddProjectResponse> {
+    return this.request('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
   }
 }
