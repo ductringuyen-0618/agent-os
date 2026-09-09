@@ -18,6 +18,8 @@ import type { AdapterContext, ProjectAdapter, SyncResult } from './types.js'
  * adapter:apply-decision for applyDecision).
  */
 export class AdapterHost {
+  private cachedProjects: ProjectConfig[] = []
+
   constructor(
     private cfg: KernelConfig,
     private log: EventLog,
@@ -40,7 +42,10 @@ export class AdapterHost {
   async loadProjects(): Promise<ProjectConfig[]> {
     const dir = path.join(this.cfg.osRoot, 'projects')
     const files = await readdir(dir).catch(() => null)
-    if (!files) return []
+    if (!files) {
+      this.cachedProjects = []
+      return []
+    }
     const projects: ProjectConfig[] = []
     for (const file of files.filter(
       (f) => f.endsWith('.yaml') || f.endsWith('.yml'),
@@ -56,7 +61,13 @@ export class AdapterHost {
       }
       projects.push(ProjectConfigSchema.parse(expanded))
     }
+    this.cachedProjects = projects
     return projects
+  }
+
+  /** Synchronous read of the last successfully loaded project list -- see this task's test file for why this exists. */
+  getCachedProjects(): ProjectConfig[] {
+    return this.cachedProjects
   }
 
   private getAdapter(project: ProjectConfig): ProjectAdapter {

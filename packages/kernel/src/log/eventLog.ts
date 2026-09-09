@@ -370,7 +370,17 @@ export class EventLog {
       .run(status, resolvedAt, error ?? null, id)
     const row = this.db.prepare('SELECT * FROM decisions WHERE id = ?').get(id)
     if (!row) throw new Error(`Decision not found: ${id}`)
-    return rowToDecision(row)
+    const decision = rowToDecision(row)
+    this.append({
+      type: 'decision.resolved',
+      payload: {
+        decisionId: decision.id,
+        status: decision.status,
+        ref: decision.ref,
+        project: decision.project,
+      },
+    })
+    return decision
   }
 
   listDecisions(opts: { status?: DecisionStatus } = {}): Decision[] {
