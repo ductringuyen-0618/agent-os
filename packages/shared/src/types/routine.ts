@@ -35,7 +35,12 @@ export interface RoutineConfig {
   timeout_ms?: number
 }
 
+export interface WorkflowsConfig {
+  max_concurrent: number
+}
+
 export interface RoutinesFile {
   defaults: RoutineDefaults
   routines: RoutineConfig[]
+  workflows?: WorkflowsConfig
 }
