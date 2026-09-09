@@ -94,6 +94,14 @@ export class EventLog {
 
   append(e: Omit<Event, 'id' | 'ts'>): Event {
     const ts = nowIso()
+    // A subprocess's stdout 'data' handler (ProcessManager) can still be
+    // in flight when kernel.stop() closes this EventLog (a narrow shutdown
+    // race, not a correctness issue for any completed run's own state) --
+    // dropping the write is safe and preferable to an uncaught "database
+    // connection is not open" exception crashing the process/test run.
+    if (!this.db.open) {
+      return { id: -1, ts, type: e.type, runId: e.runId, payload: e.payload }
+    }
     const info = this.db
       .prepare(
         'INSERT INTO events (ts, type, run_id, payload) VALUES (?, ?, ?, ?)',
