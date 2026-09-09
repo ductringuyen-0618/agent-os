@@ -6,5 +6,13 @@
   "javascript": {
     "formatter": { "quoteStyle": "single", "semicolons": "asNeeded" }
   },
-  "files": { "ignore": ["dist", "node_modules", ".agentos"] }
+  "files": {
+    "ignore": [
+      "dist",
+      "node_modules",
+      ".agentos",
+      "test-results",
+      "playwright-report"
+    ]
+  }
 }

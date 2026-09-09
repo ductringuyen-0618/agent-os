@@ -128,6 +128,35 @@ describe('DecisionCard compact brief', () => {
     expect(screen.getByTitle('Effort estimate')).toHaveTextContent('S')
   })
 
+  it('labels the card with the project, falling back to the adapter', () => {
+    installMockFetch()
+    const { rerender } = render(
+      <ToastProvider>
+        <DecisionCard
+          decision={{
+            ...fixtures.decision,
+            adapter: 'techpulse-coo',
+            project: 'agent-os',
+          }}
+          onResolved={() => {}}
+          variant="compact"
+        />
+      </ToastProvider>,
+    )
+    expect(screen.getByText(/agent-os,/)).toBeInTheDocument()
+    expect(screen.queryByText(/techpulse-coo/)).not.toBeInTheDocument()
+    rerender(
+      <ToastProvider>
+        <DecisionCard
+          decision={{ ...fixtures.decision, adapter: 'techpulse-coo' }}
+          onResolved={() => {}}
+          variant="compact"
+        />
+      </ToastProvider>,
+    )
+    expect(screen.getByText(/techpulse-coo,/)).toBeInTheDocument()
+  })
+
   it('strips list markers from the first body line', () => {
     installMockFetch()
     render(

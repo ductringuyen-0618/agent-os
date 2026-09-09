@@ -12,6 +12,11 @@ const client = new ApiClient()
 
 type Kind = 'approve' | 'reject'
 
+/** The project a decision belongs to; older rows only know the adapter. */
+export function source(decision: Decision): string | undefined {
+  return decision.project ?? decision.adapter
+}
+
 function consequence(decision: Decision, kind: Kind): string {
   const verb = kind === 'approve' ? 'approved' : 'rejected'
   if (decision.adapter) {
@@ -125,7 +130,7 @@ export function DecisionCard({
             <div className="mt-1.5 flex items-center gap-2 font-mono text-[11px] text-muted/80">
               <EffortChip effort={b.effort} />
               <span>
-                {decision.adapter ? `${decision.adapter}, ` : ''}
+                {source(decision) ? `${source(decision)}, ` : ''}
                 {relativeTime(decision.createdAt)}
               </span>
             </div>
@@ -145,8 +150,13 @@ export function DecisionCard({
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
             <StatusBadge status={decision.status} />
             <EffortChip effort={brief(decision.body).effort} />
-            {decision.adapter && (
-              <span className="chip">{decision.adapter}</span>
+            {source(decision) && (
+              <span
+                className="chip"
+                title={decision.adapter ? `via ${decision.adapter}` : undefined}
+              >
+                {source(decision)}
+              </span>
             )}
             {decision.ref && (
               <span className="font-mono text-[11px]">{decision.ref}</span>

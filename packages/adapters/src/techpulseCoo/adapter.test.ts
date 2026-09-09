@@ -138,6 +138,7 @@ describe('techpulseCooAdapter.sync — decisions', () => {
     expect(decisions[0].body).toContain('Why this increases engagement')
     expect(decisions[0].body).toContain('Effort estimate')
     expect(decisions[0].body).toContain('# Add dark mode toggle')
+    expect(decisions[0].project).toBe('techpulse')
     expect(decisions[0].body).not.toMatch(/^---/)
   })
 

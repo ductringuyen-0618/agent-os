@@ -88,14 +88,17 @@ async function ensureDecision(
     .find((d) => d.adapter === 'techpulse-coo' && d.ref === file)
   const title = extractTitle(content)
   const body = extractDecisionBody(content)
+  const project = ctx.project.name
   if (existing) {
     // A proposal edited while still pending should read the same in the
     // dashboard as in the repo. Resolved decisions keep what was decided on.
     if (
       existing.status === 'pending' &&
-      (existing.title !== title || existing.body !== body)
+      (existing.title !== title ||
+        existing.body !== body ||
+        existing.project !== project)
     ) {
-      ctx.log.updateDecision(existing.id, { title, body })
+      ctx.log.updateDecision(existing.id, { title, body, project })
       ctx.log.append({
         type: 'decision.updated',
         runId: ctx.runId,
@@ -107,6 +110,7 @@ async function ensureDecision(
   const decision = ctx.log.createDecision({
     title,
     body,
+    project,
     adapter: 'techpulse-coo',
     ref: file,
     createdByRun: ctx.runId,

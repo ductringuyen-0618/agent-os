@@ -71,6 +71,7 @@ function rowToDecision(row: any): Decision {
     title: row.title,
     body: row.body,
     adapter: row.adapter ?? undefined,
+    project: row.project ?? undefined,
     ref: row.ref ?? undefined,
     status: row.status as DecisionStatus,
     createdByRun: row.created_by_run ?? undefined,
@@ -102,6 +103,18 @@ export class EventLog {
     this.db.pragma('journal_mode = WAL')
     const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8')
     this.db.exec(schema)
+    this.migrate()
+  }
+
+  /** Additive column migrations for databases created by older builds. */
+  private migrate() {
+    const cols = (
+      this.db.prepare('PRAGMA table_info(decisions)').all() as Array<{
+        name: string
+      }>
+    ).map((c) => c.name)
+    if (!cols.includes('project'))
+      this.db.exec('ALTER TABLE decisions ADD COLUMN project TEXT')
   }
 
   append(e: Omit<Event, 'id' | 'ts'>): Event {
@@ -265,8 +278,8 @@ export class EventLog {
     const createdAt = nowIso()
     this.db
       .prepare(
-        `INSERT INTO decisions (id, title, body, adapter, ref, status, created_by_run, created_at, resolved_at, error)
-         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, NULL, NULL)`,
+        `INSERT INTO decisions (id, title, body, adapter, ref, status, created_by_run, created_at, resolved_at, error, project)
+         VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, NULL, NULL, ?)`,
       )
       .run(
         id,
@@ -276,6 +289,7 @@ export class EventLog {
         d.ref ?? null,
         d.createdByRun ?? null,
         createdAt,
+        d.project ?? null,
       )
     return rowToDecision(
       this.db.prepare('SELECT * FROM decisions WHERE id = ?').get(id),
@@ -319,13 +333,20 @@ export class EventLog {
   /** Rewrite a pending decision's title/body (e.g. its proposal was edited). */
   updateDecision(
     id: string,
-    patch: { title?: string; body?: string },
+    patch: { title?: string; body?: string; project?: string },
   ): Decision {
     const current = this.getDecision(id)
     if (!current) throw new Error(`Decision not found: ${id}`)
     this.db
-      .prepare('UPDATE decisions SET title = ?, body = ? WHERE id = ?')
-      .run(patch.title ?? current.title, patch.body ?? current.body, id)
+      .prepare(
+        'UPDATE decisions SET title = ?, body = ?, project = ? WHERE id = ?',
+      )
+      .run(
+        patch.title ?? current.title,
+        patch.body ?? current.body,
+        patch.project ?? current.project ?? null,
+        id,
+      )
     return this.getDecision(id) as Decision
   }
 

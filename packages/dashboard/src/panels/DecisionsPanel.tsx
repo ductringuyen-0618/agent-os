@@ -2,7 +2,7 @@ import type { Decision, DecisionStatus } from '@agentos/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { ApiClient, ApiError } from '../api/client'
 import { useEvents } from '../api/ws'
-import { DecisionCard } from '../components/DecisionCard'
+import { DecisionCard, source } from '../components/DecisionCard'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { SkeletonRows } from '../components/Skeleton'
@@ -141,7 +141,7 @@ export function DecisionsPanel() {
                             : d.createdAt,
                         )}
                       </span>
-                      {d.adapter && <span>{d.adapter}</span>}
+                      {source(d) && <span>{source(d)}</span>}
                     </div>
                   </button>
                 </li>

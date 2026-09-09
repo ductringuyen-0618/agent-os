@@ -75,9 +75,18 @@ describe('EventLog', () => {
 
   it('updates a decision title and body in place', () => {
     const decision = log.createDecision({ title: 'Old', body: 'old body' })
-    const updated = log.updateDecision(decision.id, { body: 'new body' })
+    expect(decision.project).toBeUndefined()
+    const updated = log.updateDecision(decision.id, {
+      body: 'new body',
+      project: 'demo',
+    })
     expect(updated.title).toBe('Old')
     expect(updated.body).toBe('new body')
+    expect(updated.project).toBe('demo')
+    expect(
+      log.createDecision({ title: 'P', body: 'b', project: 'techpulse' })
+        .project,
+    ).toBe('techpulse')
     expect(updated.status).toBe('pending')
     expect(() => log.updateDecision('nope', { body: 'x' })).toThrow(/not found/)
   })
