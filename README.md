@@ -36,7 +36,7 @@ a human clicking Approve first.
                         │ WebSocket + HTTP (127.0.0.1)
                  ┌──────┴──────┐
                  │  dashboard  │  Agents · Runs · Decisions · Wiki ·
-                 │ (React/Vite)│  Skills · Routines · Costs
+                 │ (React/Vite)│  Skills · Routines · Costs · Messages
                  └─────────────┘
 ```
 

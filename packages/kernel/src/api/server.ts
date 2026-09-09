@@ -308,6 +308,11 @@ export function buildServer(kernel: Kernel): FastifyInstance {
     })
   })
 
+  app.get('/api/messages', async (req) => {
+    const { limit } = req.query as { limit?: string }
+    return log.listMessages(limit ? Number(limit) : undefined)
+  })
+
   app.get('/api/costs', async (req) => {
     const { days } = req.query as { days?: string }
     const windowMs = (days ? Number(days) : 14) * 24 * 60 * 60 * 1000

@@ -288,4 +288,24 @@ describe('api/server runs routes', () => {
 
     await app.close()
   })
+
+  it('returns sent messages newest first, without marking them read', async () => {
+    const cfg = loadKernelConfig(osRoot, {
+      claudeBin: fakeClaudeBin,
+      runtimeDir: path.join(tmpDir, '.agentos'),
+      dbPath: path.join(tmpDir, '.agentos', 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    const app = buildServer({ cfg, log, pm } as unknown as Kernel)
+
+    log.sendMessage({ from: 'ops', to: 'librarian', body: 'first' })
+    log.sendMessage({ from: 'librarian', to: 'ops', body: 'second' })
+
+    const res = await app.inject({ method: 'GET', url: '/api/messages' })
+    const messages = res.json() as Array<{ body: string; readAt?: string }>
+    expect(messages.map((m) => m.body)).toEqual(['second', 'first'])
+    expect(messages.every((m) => m.readAt === undefined)).toBe(true)
+
+    await app.close()
+  })
 })
