@@ -9,17 +9,13 @@ import { parse as parseYaml } from 'yaml'
 import type { KernelConfig } from '../config.js'
 import type { EventLog } from '../log/eventLog.js'
 import type { WikiService } from '../wiki/wikiService.js'
-import type { ProjectAdapter, SyncResult } from './types.js'
+import type { AdapterContext, ProjectAdapter, SyncResult } from './types.js'
 
 /**
- * M3 stub: no project registry is wired up yet (packages/adapters, which
- * owns the real techpulse-coo adapter, is created in M4). loadProjects()
- * is a no-op, sync() on an unregistered project logs ops.alert and returns
- * an empty SyncResult instead of throwing (so callers like the Scheduler
- * can call kernel.adapters.sync() safely before M4), and applyDecision()
- * throws until M4 implements it. M4
- * (docs/superpowers/plans/2026-09-08-agent-os-m4-techpulse-adapter.md)
- * replaces this file with real git/frontmatter logic.
+ * Loads os/projects/*.yaml, dispatches sync()/applyDecision() to the
+ * registered ProjectAdapter for each project's `adapter` type, and wraps
+ * every call in a tracked Run (adapter:<projectName> for sync,
+ * adapter:apply-decision for applyDecision).
  */
 export class AdapterHost {
   constructor(
@@ -57,21 +53,104 @@ export class AdapterHost {
     return projects
   }
 
-  async sync(projectName: string, _runId?: string): Promise<SyncResult> {
-    const adapter = this.registry[projectName]
+  private getAdapter(project: ProjectConfig): ProjectAdapter {
+    const adapter = this.registry[project.adapter]
     if (!adapter) {
-      this.log.append({
-        type: 'ops.alert',
-        payload: { reason: 'adapter-not-implemented', projectName },
-      })
-      return { added: [], changed: [], events: [] }
+      throw new Error(`no adapter registered for '${project.adapter}'`)
     }
-    // Real ctx construction + adapter.sync() call lands in M4 alongside
-    // projects/*.yaml loading.
-    return { added: [], changed: [], events: [] }
+    return adapter
   }
 
-  async applyDecision(_decision: Decision): Promise<void> {
-    throw new Error('AdapterHost.applyDecision is implemented in M4')
+  async sync(projectName: string, runId?: string): Promise<SyncResult> {
+    const projects = await this.loadProjects()
+    const project = projects.find((p) => p.name === projectName)
+    if (!project) throw new Error(`unknown project '${projectName}'`)
+    const adapter = this.getAdapter(project)
+
+    const ownRun = !runId
+    const run = ownRun
+      ? this.log.createRun({
+          routine: `adapter:${projectName}`,
+          adapter: project.adapter,
+          payload: { action: 'sync', project: projectName },
+        })
+      : this.log.getRun(runId)
+    if (ownRun && run) {
+      this.log.updateRun(run.id, {
+        status: 'running',
+        startedAt: new Date().toISOString(),
+      })
+    }
+    const activeRunId = run?.id ?? runId
+
+    const ctx: AdapterContext = {
+      cfg: this.cfg,
+      log: this.log,
+      wiki: this.wiki,
+      project,
+      runId: activeRunId,
+    }
+    try {
+      const result = await adapter.sync(ctx)
+      if (ownRun && run) {
+        this.log.updateRun(run.id, {
+          status: 'success',
+          endedAt: new Date().toISOString(),
+        })
+      }
+      return result
+    } catch (err) {
+      if (ownRun && run) {
+        this.log.updateRun(run.id, {
+          status: 'failed',
+          endedAt: new Date().toISOString(),
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+      throw err
+    }
+  }
+
+  async applyDecision(decision: Decision): Promise<void> {
+    if (!decision.adapter) {
+      throw new Error(`decision ${decision.id} has no adapter`)
+    }
+    const projects = await this.loadProjects()
+    const project = projects.find((p) => p.adapter === decision.adapter)
+    if (!project) {
+      throw new Error(`no project configured for adapter '${decision.adapter}'`)
+    }
+    const adapter = this.getAdapter(project)
+
+    const run = this.log.createRun({
+      routine: 'adapter:apply-decision',
+      adapter: decision.adapter,
+      payload: { decisionId: decision.id },
+    })
+    this.log.updateRun(run.id, {
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    })
+    const ctx: AdapterContext = {
+      cfg: this.cfg,
+      log: this.log,
+      wiki: this.wiki,
+      project,
+      runId: run.id,
+    }
+    try {
+      await adapter.applyDecision(decision, ctx)
+      this.log.updateRun(run.id, {
+        status: 'success',
+        endedAt: new Date().toISOString(),
+      })
+    } catch (err) {
+      this.log.updateRun(run.id, {
+        status: 'failed',
+        endedAt: new Date().toISOString(),
+        error: err instanceof Error ? err.message : String(err),
+      })
+      throw err
+    }
   }
 }

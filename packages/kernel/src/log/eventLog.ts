@@ -285,6 +285,10 @@ export class EventLog {
       .map(rowToDecision)
   }
 
+  getDecision(id: string): Decision | undefined {
+    return this.listDecisions().find((d) => d.id === id)
+  }
+
   sendMessage(m: Omit<Message, 'id' | 'ts'>): Message {
     const id = nanoid()
     const ts = nowIso()
