@@ -14,9 +14,12 @@ import fastifyStatic from '@fastify/static'
 import fastifyWebsocket from '@fastify/websocket'
 import Fastify, { type FastifyInstance } from 'fastify'
 import type { Kernel } from '../kernel.js'
+import { WikiService } from '../wiki/wikiService.js'
 import { registerGithubRoutes } from './github.js'
 import { registerInternalRoutes } from './internal.js'
 import { registerProjectCrudRoutes } from './projects.js'
+import { registerSkillRoutes } from './skills.js'
+import { registerWikiRoutes } from './wiki.js'
 import { registerWorkflowRoutes } from './workflows.js'
 
 const VERSION = '0.1.0'
@@ -107,6 +110,8 @@ export function buildServer(kernel: Kernel): FastifyInstance {
   )
 
   registerInternalRoutes(app, { log, wiki, scheduler, osRoot: cfg.osRoot })
+  registerWikiRoutes(app, wiki ?? new WikiService(cfg.osRoot, log))
+  registerSkillRoutes(app, { osRoot: cfg.osRoot, log, scheduler })
   registerWorkflowRoutes(app, { engine: kernel.workflows, log })
   registerGithubRoutes(app)
   registerProjectCrudRoutes(app, { projects: kernel.projects })
@@ -248,48 +253,6 @@ export function buildServer(kernel: Kernel): FastifyInstance {
       }
     },
   )
-
-  app.get('/api/skills', async () => {
-    const skillsDir = path.join(cfg.osRoot, 'skills')
-    const names = await listSubdirs(skillsDir)
-    return Promise.all(
-      names.map(async (name) => ({
-        name,
-        path: `skills/${name}`,
-        hasLearnings: await fileExists(
-          path.join(skillsDir, name, 'learnings.md'),
-        ),
-      })),
-    )
-  })
-
-  app.get('/api/skills/:name', async (req, reply) => {
-    const { name } = req.params as { name: string }
-    const dir = path.join(cfg.osRoot, 'skills', name)
-    if (!(await fileExists(dir)))
-      return reply
-        .code(404)
-        .send({ error: 'skill not found' } satisfies ErrorResponse)
-    const readOptional = async (file: string) => {
-      try {
-        return await fsp.readFile(path.join(dir, file), 'utf8')
-      } catch {
-        return ''
-      }
-    }
-    const [skillMd, learningsMd, evalRaw, lastOutputMd] = await Promise.all([
-      readOptional('skill.md'),
-      readOptional('learnings.md'),
-      readOptional('eval.json'),
-      readOptional('last-output.md'),
-    ])
-    return {
-      skillMd,
-      learningsMd,
-      eval: evalRaw ? JSON.parse(evalRaw) : { criteria: [] },
-      lastOutputMd,
-    }
-  })
 
   app.get('/api/agents', async () => {
     const agentsDir = path.join(cfg.osRoot, 'agents')

@@ -16,6 +16,7 @@ import type {
   Run,
   RunStatus,
   SkillMeta,
+  WikiPageMeta,
   WorkflowInstance,
 } from '@agentos/shared'
 
@@ -146,6 +147,9 @@ export class ApiClient {
       'GET',
       `/api/wiki/log${limit ? `?limit=${limit}` : ''}`,
     )
+  }
+  wikiPages() {
+    return this.req<WikiPageMeta[]>('GET', '/api/wiki/pages')
   }
   wikiPage(path: string) {
     return this.req<{ content: string }>(

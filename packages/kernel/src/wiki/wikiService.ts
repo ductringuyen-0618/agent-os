@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import type { WikiPageMeta } from '@agentos/shared'
 import matter from 'gray-matter'
 import type { EventLog } from '../log/eventLog.js'
 import {
@@ -136,6 +137,51 @@ export class WikiService {
     if (!limit) return full
     const entries = full.split(/\n(?=## \[)/)
     return entries.slice(-limit).join('\n')
+  }
+
+  /**
+   * Every page under wiki/ with its frontmatter, newest first. index.md
+   * and log.md are bookkeeping, not pages, so they are left out.
+   */
+  async listPages(): Promise<WikiPageMeta[]> {
+    const dir = this.wikiDir()
+    const files = (await listFilesRecursive(dir)).filter(
+      (f) => f.endsWith('.md') && f !== 'index.md' && f !== 'log.md',
+    )
+    const pages = await Promise.all(
+      files.map(async (f): Promise<WikiPageMeta | null> => {
+        const full = path.join(dir, f)
+        try {
+          const [raw, stat] = await Promise.all([
+            fs.readFile(full, 'utf8'),
+            fs.stat(full),
+          ])
+          const { data } = matter(raw)
+          const sources = Array.isArray(data.sources)
+            ? data.sources.map(String)
+            : []
+          return {
+            path: f,
+            title:
+              typeof data.title === 'string' && data.title
+                ? data.title
+                : path.basename(f, '.md'),
+            type: typeof data.type === 'string' ? data.type : 'page',
+            updated:
+              typeof data.updated === 'string'
+                ? data.updated
+                : stat.mtime.toISOString(),
+            sources,
+            bytes: stat.size,
+          }
+        } catch {
+          return null
+        }
+      }),
+    )
+    return pages
+      .filter((p): p is WikiPageMeta => p !== null)
+      .sort((a, b) => b.updated.localeCompare(a.updated))
   }
 
   async listUnindexedRaw(): Promise<string[]> {

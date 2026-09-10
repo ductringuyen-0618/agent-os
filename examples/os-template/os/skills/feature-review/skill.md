@@ -1,3 +1,6 @@
+---
+description: Reads the feature branch against its proposal and returns PASS or FAIL with reasons.
+---
 # Skill: feature-review
 
 Trigger: workflow `feature-request`, step `review` (or `review-fix`).

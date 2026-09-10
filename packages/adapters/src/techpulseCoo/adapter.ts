@@ -15,6 +15,7 @@ import {
   openPullRequest,
   pushBranch,
   pushProposal,
+  setProposalStatus,
   writeReport,
 } from './requests.js'
 
@@ -318,6 +319,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
     markShipped,
     writeReport,
     pushBranch,
+    setProposalStatus,
   },
 }
 

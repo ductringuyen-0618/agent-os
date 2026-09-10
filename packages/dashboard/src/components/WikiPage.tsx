@@ -4,9 +4,33 @@ import ReactMarkdown, {
 } from 'react-markdown'
 
 const WIKILINK = /\[\[([^\]]+)\]\]/g
+const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/
 
 function toMarkdownLinks(content: string): string {
   return content.replace(WIKILINK, (_m, path) => `[${path}](wiki:${path})`)
+}
+
+/** Frontmatter is metadata for the index, not prose for the reader. */
+export function stripFrontmatter(content: string): string {
+  return content.replace(FRONTMATTER, '')
+}
+
+/**
+ * Resolves a page-relative link ("../state.md", "./sources/x.md") against
+ * the page it appears on; anything else is taken as wiki-root-relative,
+ * which is how index.md and agent-written pages link.
+ */
+export function resolveWikiHref(href: string, from?: string): string {
+  const clean = href.replace(/^wiki:/, '').replace(/#.*$/, '')
+  const base = from ? from.split('/').slice(0, -1) : []
+  const parts = clean.startsWith('.') ? [...base] : []
+  for (const seg of clean.split('/')) {
+    if (seg === '' || seg === '.') continue
+    if (seg === '..') parts.pop()
+    else parts.push(seg)
+  }
+  const joined = parts.join('/')
+  return joined.endsWith('.md') || joined === '' ? joined : `${joined}.md`
 }
 
 // react-markdown's default urlTransform sanitizes any URL scheme it doesn't
@@ -21,17 +45,24 @@ function wikiAwareUrlTransform(url: string): string {
   return url.startsWith('wiki:') ? url : defaultUrlTransform(url)
 }
 
+const EXTERNAL = /^[a-z][a-z0-9+.-]*:/i
+
 export function WikiPage({
   content,
   onNavigate,
+  currentPath,
 }: {
   content: string
   onNavigate: (path: string) => void
+  /** Wiki-relative path of the page being shown, for resolving `../` links. */
+  currentPath?: string
 }) {
   const components: Components = {
     a: ({ href, children }) => {
-      if (href?.startsWith('wiki:')) {
-        const path = href.slice('wiki:'.length)
+      const internal =
+        href !== undefined && (href.startsWith('wiki:') || !EXTERNAL.test(href))
+      if (internal && href) {
+        const path = resolveWikiHref(href, currentPath)
         return (
           <a
             href={`#${path}`}
@@ -63,7 +94,7 @@ export function WikiPage({
         components={components}
         urlTransform={wikiAwareUrlTransform}
       >
-        {toMarkdownLinks(content)}
+        {toMarkdownLinks(stripFrontmatter(content))}
       </ReactMarkdown>
     </div>
   )

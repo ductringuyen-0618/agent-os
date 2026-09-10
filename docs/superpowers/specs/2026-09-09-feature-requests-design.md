@@ -214,6 +214,15 @@ build:
   timeout_ms: 2400000
 ```
 
+Without a `build:` block the workflow stops after approval (`succeeded`
+with only brief / push-proposal / await-approval steps) and the project's
+own COO routine builds the approved proposal on its next run; the Requests
+view says so. With one, the workflow first flips the proposal's frontmatter
+to `status: building` (`mark-building`) so a concurrently firing COO
+routine, which only takes `approved` proposals, never builds the same
+feature twice; a failed pipeline hands it back as `approved`
+(`unmark-building`), a shipped one ends as `shipped`.
+
 The Add-project dialog has a "Let agent-os build features in this repo"
 switch that writes this block with sensible defaults (checks inferred
 from the repo: package.json scripts, pyproject, Makefile). Without it a

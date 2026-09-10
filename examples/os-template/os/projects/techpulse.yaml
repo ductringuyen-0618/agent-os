@@ -7,3 +7,20 @@ options:
   proposals_path: docs/missions/coo/proposals
   state_path: docs/missions/coo/state.md
   reports_path: docs/missions/coo/reports
+# Grant agent-os permission to build approved feature requests in the clone.
+# Without it a request stops after approval and the project's COO routine
+# builds it instead. `checks` are the commands the validate step must pass;
+# mirror the project's CI so nothing reaches a pull request that CI rejects.
+build:
+  enabled: true
+  model: sonnet
+  permission_mode: acceptEdits
+  allowed_tools: [Bash, Read, Write, Edit, Glob, Grep]
+  checks:
+    - cd frontend && npm ci --no-audit --no-fund
+    - cd frontend && npm run lint
+    - cd frontend && npx prettier --check "src/**/*.{js,jsx,ts,tsx,json,css,md}"
+    - cd frontend && npx tsc --noEmit
+    - cd frontend && npm run build
+    - cd backend && uvx ruff check .
+  timeout_ms: 1800000

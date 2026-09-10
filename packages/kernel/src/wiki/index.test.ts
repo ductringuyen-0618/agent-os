@@ -70,3 +70,29 @@ describe('log helpers', () => {
     expect(out).toContain('## [2026-09-08] ingest | Proposal 001')
   })
 })
+
+describe('upsertIndexEntry placeholder', () => {
+  it('drops the template "(none yet ...)" bullet once a real page is indexed', () => {
+    const template = [
+      '# Wiki Index',
+      '',
+      '## Pages',
+      '- (none yet — this is a fresh instance; the `heartbeat`, `ingest`,',
+      '  and `daily-digest` routines populate it as they run)',
+      '',
+      '## Directory guide',
+      '- `wiki/agents/` — one page per agent',
+      '',
+    ].join('\n')
+    const out = upsertIndexEntry(template, {
+      path: 'projects/x/overview.md',
+      title: 'overview',
+      type: 'ingest',
+      updated: '2026-09-09T00:00:00.000Z',
+    })
+    expect(out).not.toContain('none yet')
+    expect(out).not.toContain('daily-digest` routines populate')
+    expect(out).toContain('- `wiki/agents/` — one page per agent')
+    expect(out).toContain('[overview](projects/x/overview.md)')
+  })
+})

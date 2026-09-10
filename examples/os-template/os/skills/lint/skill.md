@@ -1,3 +1,6 @@
+---
+description: Nightly wiki hygiene: contradictions, stale claims, orphan pages, missing sources.
+---
 # Skill: lint
 
 Trigger: routine `lint`, `cron: "0 3 * * *"`. Agent: `librarian`.

@@ -323,3 +323,41 @@ export async function pushBranch(
     payload: { branch, reason: 'ci-fix' },
   })
 }
+
+/**
+ * Rewrites the proposal's frontmatter `status:` on base_branch and pushes.
+ * The workflow sets `building` when it starts so the project's own COO
+ * routine, which only picks up `approved` proposals, does not build the
+ * same feature a second time; on failure it goes back to `approved`.
+ */
+export async function setProposalStatus(
+  ctx: AdapterContext,
+  slug: string,
+  proposalFile: string,
+  status: string,
+): Promise<void> {
+  const git = simpleGit(ctx.project.clone)
+  await git.checkout(ctx.project.base_branch)
+  await git.pull('origin', ctx.project.base_branch, ['--ff-only'])
+  const absPath = path.join(ctx.project.clone, proposalFile)
+  const content = await readFile(absPath, 'utf8')
+  const next = setStatus(content, status)
+  if (next === content) return
+  await writeFile(absPath, next, 'utf8')
+  await git.add([posix(proposalFile)])
+  const subject = `chore(coo): mark ${slug} ${status}`
+  const commitResult = await git.commit(
+    `${subject}\n\nCo-Authored-By: Claude via agent-os <noreply@anthropic.com>`,
+  )
+  ctx.log.append({
+    type: 'git.commit',
+    runId: ctx.runId,
+    payload: { slug, sha: commitResult.commit, message: subject },
+  })
+  await git.push('origin', ctx.project.base_branch)
+  ctx.log.append({
+    type: 'git.push',
+    runId: ctx.runId,
+    payload: { slug, branch: ctx.project.base_branch, status },
+  })
+}

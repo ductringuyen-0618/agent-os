@@ -275,6 +275,7 @@ export function createFeatureRequestWorkflow(
         // it through the existing approve-then-cloud-COO path.
         return
       }
+      const buildCfg = project.build
 
       const branch = `req/${slug}`
       const buildTask = {
@@ -284,181 +285,208 @@ export function createFeatureRequestWorkflow(
         description: ctx.input.description,
         proposalPath,
       }
-      await runBuildStep(ctx, project, buildTask, 'build')
 
-      let validateRun = await ctx.step.run(
-        'validate',
-        checkSpec(
-          project,
-          'feature-validate',
-          { branch, checks: project.build.checks },
-          'acceptEdits',
-          ['Bash'],
-        ),
-      )
-      assertRunSucceeded(validateRun, 'validate')
-      let validateOutcome = parsePassFail(validateRun.resultText)
+      // The project's own COO routine also builds `approved` proposals.
+      // Flip this one to `building` for the duration so the two never
+      // build the same feature; a failure hands it back as `approved`.
+      // An arrow, not a hoisted function declaration, so TypeScript keeps
+      // the `project` narrowing from the guard above inside the closure.
+      const buildAndShip = async (): Promise<void> => {
+        await runBuildStep(ctx, project, buildTask, 'build')
 
-      let reviewOutcome = { pass: false, text: '' }
-      if (validateOutcome.pass) {
-        const reviewRun = await ctx.step.run(
-          'review',
-          checkSpec(
-            project,
-            'feature-review',
-            { branch, proposalMarkdown: proposalBody },
-            'default',
-            ['Read', 'Glob', 'Grep'],
-          ),
-        )
-        assertRunSucceeded(reviewRun, 'review')
-        reviewOutcome = parsePassFail(reviewRun.resultText)
-      }
-
-      if (!validateOutcome.pass || !reviewOutcome.pass) {
-        const failureOutput = !validateOutcome.pass
-          ? validateOutcome.text
-          : reviewOutcome.text
-        await runBuildStep(
-          ctx,
-          project,
-          { ...buildTask, priorFailure: failureOutput },
-          'build-fix',
-        )
-
-        validateRun = await ctx.step.run(
-          'validate-fix',
+        let validateRun = await ctx.step.run(
+          'validate',
           checkSpec(
             project,
             'feature-validate',
-            { branch, checks: project.build.checks },
+            { branch, checks: buildCfg.checks },
             'acceptEdits',
             ['Bash'],
           ),
         )
-        assertRunSucceeded(validateRun, 'validate-fix')
-        validateOutcome = parsePassFail(validateRun.resultText)
-        if (!validateOutcome.pass) {
-          throw new Error(
-            `validate failed after one fix attempt:\n${validateOutcome.text}`,
+        assertRunSucceeded(validateRun, 'validate')
+        let validateOutcome = parsePassFail(validateRun.resultText)
+
+        let reviewOutcome = { pass: false, text: '' }
+        if (validateOutcome.pass) {
+          const reviewRun = await ctx.step.run(
+            'review',
+            checkSpec(
+              project,
+              'feature-review',
+              { branch, proposalMarkdown: proposalBody },
+              'default',
+              ['Read', 'Glob', 'Grep'],
+            ),
           )
+          assertRunSucceeded(reviewRun, 'review')
+          reviewOutcome = parsePassFail(reviewRun.resultText)
         }
 
-        const reviewFixRun = await ctx.step.run(
-          'review-fix',
-          checkSpec(
-            project,
-            'feature-review',
-            { branch, proposalMarkdown: proposalBody },
-            'default',
-            ['Read', 'Glob', 'Grep'],
-          ),
-        )
-        assertRunSucceeded(reviewFixRun, 'review-fix')
-        reviewOutcome = parsePassFail(reviewFixRun.resultText)
-        if (!reviewOutcome.pass) {
-          throw new Error(
-            `review failed after one fix attempt:\n${reviewOutcome.text}`,
-          )
-        }
-      }
-
-      const openPr = await ctx.step.do('open-pr', {}, () =>
-        ops.openPullRequest(actx, {
-          branch,
-          slug,
-          title: ctx.input.title,
-          proposalFile: pushResult.file,
-          proposalWhatWhy: extractWhatWhy(proposalBody),
-          validationOutput: validateOutcome.text,
-          reviewOutput: reviewOutcome.text,
-        }),
-      )
-
-      // CI gate: nothing is shipped until the pull request's checks pass.
-      // Local validation is necessary, never sufficient. One fix cycle is
-      // allowed; a second red CI fails the request and leaves the branch
-      // and PR in place for a human.
-      let ciSummary = openPr.skipped ? `no CI: ${openPr.skipped}` : 'CI not run'
-      if (openPr.number > 0) {
-        const github = deps.github ?? {
-          getPrChecks,
-          getFailedJobLog,
-        }
-        const first = await waitForChecks(
-          ctx,
-          github,
-          project.repo,
-          openPr.number,
-          deps,
-          1,
-        )
-        if (first.failed.length > 0) {
-          const log = await ctx.step.do('ci-failure-log', {}, () =>
-            github.getFailedJobLog(project.repo, first.failed[0].url),
-          )
-          const ciFailure = [
-            `CI failed on the pull request: ${first.failed.map((f) => f.name).join(', ')}`,
-            log ? `\nFailing job log (tail):\n${log}` : '',
-          ].join('')
+        if (!validateOutcome.pass || !reviewOutcome.pass) {
+          const failureOutput = !validateOutcome.pass
+            ? validateOutcome.text
+            : reviewOutcome.text
           await runBuildStep(
             ctx,
             project,
-            { ...buildTask, priorFailure: ciFailure },
-            'build-fix-ci',
+            { ...buildTask, priorFailure: failureOutput },
+            'build-fix',
           )
-          await ctx.step.do('push-fix', {}, () => ops.pushBranch(actx, branch))
-          const second = await waitForChecks(
+
+          validateRun = await ctx.step.run(
+            'validate-fix',
+            checkSpec(
+              project,
+              'feature-validate',
+              { branch, checks: buildCfg.checks },
+              'acceptEdits',
+              ['Bash'],
+            ),
+          )
+          assertRunSucceeded(validateRun, 'validate-fix')
+          validateOutcome = parsePassFail(validateRun.resultText)
+          if (!validateOutcome.pass) {
+            throw new Error(
+              `validate failed after one fix attempt:\n${validateOutcome.text}`,
+            )
+          }
+
+          const reviewFixRun = await ctx.step.run(
+            'review-fix',
+            checkSpec(
+              project,
+              'feature-review',
+              { branch, proposalMarkdown: proposalBody },
+              'default',
+              ['Read', 'Glob', 'Grep'],
+            ),
+          )
+          assertRunSucceeded(reviewFixRun, 'review-fix')
+          reviewOutcome = parsePassFail(reviewFixRun.resultText)
+          if (!reviewOutcome.pass) {
+            throw new Error(
+              `review failed after one fix attempt:\n${reviewOutcome.text}`,
+            )
+          }
+        }
+
+        const openPr = await ctx.step.do('open-pr', {}, () =>
+          ops.openPullRequest(actx, {
+            branch,
+            slug,
+            title: ctx.input.title,
+            proposalFile: pushResult.file,
+            proposalWhatWhy: extractWhatWhy(proposalBody),
+            validationOutput: validateOutcome.text,
+            reviewOutput: reviewOutcome.text,
+          }),
+        )
+
+        // CI gate: nothing is shipped until the pull request's checks pass.
+        // Local validation is necessary, never sufficient. One fix cycle is
+        // allowed; a second red CI fails the request and leaves the branch
+        // and PR in place for a human.
+        let ciSummary = openPr.skipped
+          ? `no CI: ${openPr.skipped}`
+          : 'CI not run'
+        if (openPr.number > 0) {
+          const github = deps.github ?? {
+            getPrChecks,
+            getFailedJobLog,
+          }
+          const first = await waitForChecks(
             ctx,
             github,
             project.repo,
             openPr.number,
             deps,
-            2,
+            1,
           )
-          if (second.failed.length > 0) {
-            throw new Error(
-              `CI still failing after one fix attempt: ${second.failed.map((f) => f.name).join(', ')} (${openPr.url})`,
+          if (first.failed.length > 0) {
+            const log = await ctx.step.do('ci-failure-log', {}, () =>
+              github.getFailedJobLog(project.repo, first.failed[0].url),
             )
+            const ciFailure = [
+              `CI failed on the pull request: ${first.failed.map((f) => f.name).join(', ')}`,
+              log ? `\nFailing job log (tail):\n${log}` : '',
+            ].join('')
+            await runBuildStep(
+              ctx,
+              project,
+              { ...buildTask, priorFailure: ciFailure },
+              'build-fix-ci',
+            )
+            await ctx.step.do('push-fix', {}, () =>
+              ops.pushBranch(actx, branch),
+            )
+            const second = await waitForChecks(
+              ctx,
+              github,
+              project.repo,
+              openPr.number,
+              deps,
+              2,
+            )
+            if (second.failed.length > 0) {
+              throw new Error(
+                `CI still failing after one fix attempt: ${second.failed.map((f) => f.name).join(', ')} (${openPr.url})`,
+              )
+            }
+            ciSummary = `CI passed after one fix: ${second.passed.join(', ')}`
+          } else {
+            ciSummary = `CI passed: ${first.passed.join(', ')}`
           }
-          ciSummary = `CI passed after one fix: ${second.passed.join(', ')}`
-        } else {
-          ciSummary = `CI passed: ${first.passed.join(', ')}`
         }
+
+        await ctx.step.do('ship', {}, async () => {
+          await ops.markShipped(actx, slug, pushResult.file)
+          await ops.writeReport(actx, {
+            slug,
+            branch,
+            prUrl: openPr.url || (openPr.skipped ?? ''),
+            validationOutput: `${validateOutcome.text}\n\n${ciSummary}`,
+            reviewOutput: reviewOutcome.text,
+          })
+        })
+
+        await ctx.step.do('done', {}, async () => {
+          await kernel.wiki.writePage({
+            path: `requests/${ctx.id}/summary.md`,
+            content: renderSummary(ctx.input, {
+              slug,
+              branch,
+              prUrl: openPr.url || (openPr.skipped ?? ''),
+            }),
+            op: 'note',
+          })
+          await kernel.wiki.writePage({
+            path: `projects/${project.name}/requests/${slug}.md`,
+            content: renderRequestPage(ctx.input, {
+              slug,
+              branch,
+              prUrl: openPr.url || (openPr.skipped ?? ''),
+            }),
+            op: 'note',
+            links: [pushResult.file],
+          })
+        })
       }
 
-      await ctx.step.do('ship', {}, async () => {
-        await ops.markShipped(actx, slug, pushResult.file)
-        await ops.writeReport(actx, {
-          slug,
-          branch,
-          prUrl: openPr.url || (openPr.skipped ?? ''),
-          validationOutput: `${validateOutcome.text}\n\n${ciSummary}`,
-          reviewOutput: reviewOutcome.text,
-        })
-      })
-
-      await ctx.step.do('done', {}, async () => {
-        await kernel.wiki.writePage({
-          path: `requests/${ctx.id}/summary.md`,
-          content: renderSummary(ctx.input, {
-            slug,
-            branch,
-            prUrl: openPr.url || (openPr.skipped ?? ''),
-          }),
-          op: 'note',
-        })
-        await kernel.wiki.writePage({
-          path: `projects/${project.name}/requests/${slug}.md`,
-          content: renderRequestPage(ctx.input, {
-            slug,
-            branch,
-            prUrl: openPr.url || (openPr.skipped ?? ''),
-          }),
-          op: 'note',
-          links: [pushResult.file],
-        })
-      })
+      // The project's own COO routine also builds `approved` proposals.
+      // Flip this one to `building` for the duration so the two never
+      // build the same feature; a failure hands it back as `approved`.
+      await ctx.step.do('mark-building', {}, () =>
+        ops.setProposalStatus(actx, slug, pushResult.file, 'building'),
+      )
+      try {
+        await buildAndShip()
+      } catch (err) {
+        await ctx.step.do('unmark-building', {}, () =>
+          ops.setProposalStatus(actx, slug, pushResult.file, 'approved'),
+        )
+        throw err
+      }
     },
   }
 }

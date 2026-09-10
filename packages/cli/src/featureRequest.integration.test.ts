@@ -467,7 +467,7 @@ describe('createFeatureRequestWorkflow', () => {
   })
 
   it('fails the instance when validate still fails after the one fix attempt', async () => {
-    const { cloneDir } = await createBareCooRepo()
+    const { bareDir, cloneDir } = await createBareCooRepo()
     const proj = project(cloneDir, true)
     kernelDeps.adapters.loadProjects = vi.fn().mockResolvedValue([proj])
     const def = createFeatureRequestWorkflow(deps)
@@ -492,6 +492,24 @@ describe('createFeatureRequestWorkflow', () => {
       'build-fix',
       'validate-fix',
     ])
+    // The proposal was `building` while the pipeline ran and is handed
+    // back as `approved` on failure, so the COO routine can pick it up.
+    const verifyDir = mkdtempSync(path.join(tmpdir(), 'agentos-fr-status-'))
+    await simpleGit().clone(bareDir, verifyDir)
+    const fs = await import('node:fs/promises')
+    const proposalsDir = path.join(verifyDir, 'docs/missions/coo/proposals')
+    const file = (await fs.readdir(proposalsDir)).find((f) =>
+      f.endsWith('.md'),
+    ) as string
+    const content = await fs.readFile(path.join(proposalsDir, file), 'utf8')
+    expect(content).toContain('status: approved')
+    const history = await simpleGit(verifyDir).log()
+    expect(history.all.map((c) => c.message)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('mark fix-thing building'),
+        expect.stringContaining('mark fix-thing approved'),
+      ]),
+    )
   })
 
   /** Full green pipeline up to open-pr with a fake gh that prints `url`. */

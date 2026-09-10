@@ -1,3 +1,6 @@
+---
+description: Runs the project's validation commands on the feature branch and reports PASS or FAIL.
+---
 # Skill: feature-validate
 
 Trigger: workflow `feature-request`, step `validate` (or `validate-fix`).

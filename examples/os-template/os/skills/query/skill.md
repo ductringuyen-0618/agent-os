@@ -1,3 +1,6 @@
+---
+description: Answers a question from the wiki alone and cites the pages it used.
+---
 # Skill: query
 
 Trigger: manual (`agentos run query --payload '{"question": "..."}'`).

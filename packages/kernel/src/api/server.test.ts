@@ -252,7 +252,16 @@ describe('api/server runs routes', () => {
 
     const skills = await app.inject({ method: 'GET', url: '/api/skills' })
     expect(skills.json()).toEqual([
-      { name: 'heartbeat', path: 'skills/heartbeat', hasLearnings: false },
+      {
+        name: 'heartbeat',
+        path: 'skills/heartbeat',
+        hasLearnings: false,
+        description: 'Check routines.',
+        routines: [],
+        runs: 0,
+        succeeded: 0,
+        costUsd: 0,
+      },
     ])
 
     const agents = await app.inject({ method: 'GET', url: '/api/agents' })
@@ -306,6 +315,107 @@ describe('api/server runs routes', () => {
     expect(messages.map((m) => m.body)).toEqual(['second', 'first'])
     expect(messages.every((m) => m.readAt === undefined)).toBe(true)
 
+    await app.close()
+  })
+  it('serves wiki pages, page content, and the log, and refuses paths outside wiki/', async () => {
+    const cfg = loadKernelConfig(osRoot, {
+      claudeBin: fakeClaudeBin,
+      runtimeDir: path.join(tmpDir, '.agentos'),
+      dbPath: path.join(tmpDir, '.agentos', 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    const wiki = new WikiService(osRoot, log)
+    await fsp.mkdir(path.join(osRoot, 'wiki'), { recursive: true })
+    await wiki.writePage({
+      path: 'projects/techpulse/overview.md',
+      content: '# TechPulse\n\nOverview.',
+      links: ['raw/techpulse/state.md'],
+      op: 'ingest',
+    })
+    await fsp.writeFile(path.join(osRoot, 'secret.md'), 'nope')
+    const app = buildServer({ cfg, log, pm, wiki } as unknown as Kernel)
+
+    const pages = await app.inject({ method: 'GET', url: '/api/wiki/pages' })
+    expect(pages.statusCode).toBe(200)
+    expect(pages.json()).toMatchObject([
+      {
+        path: 'projects/techpulse/overview.md',
+        title: 'overview',
+        type: 'ingest',
+        sources: ['raw/techpulse/state.md'],
+      },
+    ])
+
+    const page = await app.inject({
+      method: 'GET',
+      url: '/api/wiki/page?path=projects/techpulse/overview.md',
+    })
+    expect(page.statusCode).toBe(200)
+    expect(page.json().content).toContain('# TechPulse')
+
+    const index = await app.inject({ method: 'GET', url: '/api/wiki/index' })
+    expect(index.json().content).toContain('projects/techpulse/overview.md')
+
+    const wikiLog = await app.inject({ method: 'GET', url: '/api/wiki/log' })
+    expect(wikiLog.json().content).toContain('ingest | overview')
+
+    const outside = await app.inject({
+      method: 'GET',
+      url: '/api/wiki/page?path=../secret.md',
+    })
+    expect(outside.statusCode).toBe(404)
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/wiki/page?path=nope.md',
+    })
+    expect(missing.statusCode).toBe(404)
+    await app.close()
+  })
+
+  it('summarises skill runs from the event log and strips bootstrap learnings', async () => {
+    const cfg = loadKernelConfig(osRoot, {
+      claudeBin: fakeClaudeBin,
+      runtimeDir: path.join(tmpDir, '.agentos'),
+      dbPath: path.join(tmpDir, '.agentos', 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    await fsp.writeFile(
+      path.join(osRoot, 'skills', 'heartbeat', 'LEARNINGS.md'),
+      '# Learnings: heartbeat\n\n(Empty at bootstrap.)\n',
+    )
+    const ok = log.createRun({ routine: 'heartbeat', skill: 'heartbeat' })
+    log.updateRun(ok.id, {
+      status: 'success',
+      startedAt: '2026-09-09T10:00:00.000Z',
+      costUsd: 0.25,
+    })
+    const bad = log.createRun({ routine: 'heartbeat', skill: 'heartbeat' })
+    log.updateRun(bad.id, {
+      status: 'failed',
+      startedAt: '2026-09-09T11:00:00.000Z',
+      costUsd: 0.05,
+    })
+    const app = buildServer({ cfg, log, pm } as unknown as Kernel)
+
+    const skills = await app.inject({ method: 'GET', url: '/api/skills' })
+    expect(skills.json()).toMatchObject([
+      {
+        name: 'heartbeat',
+        hasLearnings: false,
+        runs: 2,
+        succeeded: 1,
+        lastStatus: 'failed',
+        lastRunAt: '2026-09-09T11:00:00.000Z',
+      },
+    ])
+    expect(skills.json()[0].costUsd).toBeCloseTo(0.3)
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: '/api/skills/heartbeat',
+    })
+    expect(detail.json().learningsMd).toBe('')
+    expect(detail.json().skillMd).toContain('Heartbeat skill')
     await app.close()
   })
 })
