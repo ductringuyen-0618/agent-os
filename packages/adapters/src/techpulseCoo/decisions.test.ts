@@ -12,6 +12,7 @@ import {
   REJECT_LABEL,
   decisionIdOf,
   issueBody,
+  issueMarker,
   reconcileGithubDecisions,
   verdictOf,
 } from './decisions.js'
@@ -141,11 +142,25 @@ describe('verdictOf', () => {
   })
 })
 
-describe('issueBody / decisionIdOf', () => {
-  it('round-trips the decision id through the hidden marker', () => {
+describe('issueBody / issueMarker', () => {
+  it('round-trips the decision id and proposal ref through the hidden marker', () => {
     const body = issueBody(decision('d7'), 'techpulse')
     expect(decisionIdOf({ ...issue(1, 'x'), body })).toBe('d7')
+    expect(issueMarker({ ...issue(1, 'x'), body })).toEqual({
+      id: 'd7',
+      ref: 'proposals/007-idea.md',
+    })
     expect(body).toContain('agentos:approve')
+  })
+  it('reads a cloud-written ref-only marker and a legacy bare id', () => {
+    expect(
+      issueMarker({
+        ...issue(1, 'x'),
+        body: '<!-- agentos:decision ref=proposals/003-x.md -->
+hi',
+      }),
+    ).toEqual({ ref: 'proposals/003-x.md' })
+    expect(issueMarker(issue(1, 'legacy'))).toEqual({ id: 'legacy' })
   })
 })
 
@@ -192,6 +207,28 @@ describe('reconcileGithubDecisions', () => {
     const out = await reconcileGithubDecisions(ctx, async () => {}, port)
     expect(out.resolved).toEqual([])
     expect(calls).toEqual(['labels', 'close #6: Decided elsewhere: rejected'])
+  })
+
+  it('adopts an issue the cloud COO opened for the same proposal instead of opening another', async () => {
+    const { ctx } = makeCtx([decision('d1')])
+    const cloudIssue: GithubIssue = {
+      ...issue(9, 'ignored'),
+      body: '<!-- agentos:decision ref=proposals/001-idea.md -->
+body',
+      labels: [{ name: DECISION_LABEL }, { name: APPROVE_LABEL }],
+    }
+    const { port, calls } = fakePort([cloudIssue])
+    const applied: string[] = []
+    const out = await reconcileGithubDecisions(
+      ctx,
+      async (d, status) => {
+        applied.push(`${d.id}:${status}`)
+      },
+      port,
+    )
+    expect(out.opened).toEqual([])
+    expect(applied).toEqual(['d1:approved'])
+    expect(calls).toEqual(['labels', 'close #9: Approved via GitHub'])
   })
 
   it('does nothing for a remote that is not on GitHub', async () => {

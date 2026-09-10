@@ -14,7 +14,7 @@ import { ghInvoke } from './requests.js'
 export const DECISION_LABEL = 'agentos:decision'
 export const APPROVE_LABEL = 'agentos:approve'
 export const REJECT_LABEL = 'agentos:reject'
-const MARKER = /<!--\s*agentos:decision\s+([\w-]+)\s*-->/
+const MARKER = /<!--\s*agentos:decision\s+([^>]*?)\s*-->/
 
 export interface GithubIssue {
   number: number
@@ -106,13 +106,31 @@ export const ghDecisionPort: GithubDecisionPort = {
   },
 }
 
+/**
+ * The hidden marker names the decision and its proposal. agent-os writes
+ * `id=<decisionId> ref=<proposal ref>`; the cloud COO, which knows no
+ * decision ids, writes `ref=<proposal ref>` only; a bare token is a legacy
+ * decision id. Matching by ref is what lets both sides share one issue.
+ */
+export function issueMarker(issue: GithubIssue): { id?: string; ref?: string } {
+  const raw = MARKER.exec(issue.body ?? '')?.[1]
+  if (!raw) return {}
+  const out: { id?: string; ref?: string } = {}
+  for (const token of raw.split(/\s+/)) {
+    if (token.startsWith('id=')) out.id = token.slice(3)
+    else if (token.startsWith('ref=')) out.ref = token.slice(4)
+    else if (!out.id && /^[\w-]+$/.test(token)) out.id = token
+  }
+  return out
+}
+
 export function decisionIdOf(issue: GithubIssue): string | undefined {
-  return MARKER.exec(issue.body ?? '')?.[1]
+  return issueMarker(issue).id
 }
 
 export function issueBody(decision: Decision, project: string): string {
   return [
-    `<!-- agentos:decision ${decision.id} -->`,
+    `<!-- agentos:decision id=${decision.id} ref=${decision.ref ?? ''} -->`,
     `agent-os is waiting for your decision on **${project}**.`,
     '',
     '**To decide from here:** add the label `agentos:approve` or `agentos:reject`,',
@@ -201,13 +219,23 @@ export async function reconcileGithubDecisions(
     return outcome
   }
   const byDecision = new Map<string, GithubIssue>()
+  const byRef = new Map<string, GithubIssue>()
   for (const issue of issues) {
-    const id = decisionIdOf(issue)
-    if (id) byDecision.set(id, issue)
+    const marker = issueMarker(issue)
+    if (marker.id) byDecision.set(marker.id, issue)
+    // Prefer an open issue per ref: a closed one from an earlier decision
+    // on the same file must not hide a fresh one.
+    if (marker.ref) {
+      const existing = byRef.get(marker.ref)
+      if (!existing || issue.state.toUpperCase() === 'OPEN')
+        byRef.set(marker.ref, issue)
+    }
   }
 
   for (const decision of mine) {
-    const issue = byDecision.get(decision.id)
+    const issue =
+      byDecision.get(decision.id) ??
+      (decision.ref ? byRef.get(decision.ref) : undefined)
     if (decision.status === 'pending' && !issue) {
       const number = await port.createIssue(
         repo,
