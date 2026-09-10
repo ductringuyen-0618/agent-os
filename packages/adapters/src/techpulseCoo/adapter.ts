@@ -128,12 +128,17 @@ async function ensureDecision(
   file: string,
   content: string,
 ): Promise<void> {
+  const project = ctx.project.name
+  // One decision per proposal file per project. Rows written before
+  // decisions recorded their project carry none, so those match on ref.
   const existing = ctx.log
     .listDecisions()
-    .find((d) => d.adapter === 'techpulse-coo' && d.ref === file)
+    .find(
+      (d) =>
+        d.ref === file && (d.project === project || d.project === undefined),
+    )
   const title = extractTitle(content)
   const body = extractDecisionBody(content)
-  const project = ctx.project.name
   if (existing) {
     // A proposal edited while still pending should read the same in the
     // dashboard as in the repo. Resolved decisions keep what was decided on.
@@ -156,7 +161,10 @@ async function ensureDecision(
     title,
     body,
     project,
-    adapter: 'techpulse-coo',
+    // The name this project is configured with (`coo-missions`, or the
+    // legacy `techpulse-coo` alias), so the dashboard's approve/reject
+    // routes the decision back to the same registry entry.
+    adapter: ctx.project.adapter ?? techpulseCooAdapter.name,
     ref: file,
     createdByRun: ctx.runId,
   })

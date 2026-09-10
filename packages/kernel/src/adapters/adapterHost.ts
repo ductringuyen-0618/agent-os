@@ -161,12 +161,19 @@ export class AdapterHost {
           : `no project configured for adapter '${decision.adapter}'`,
       )
     }
-    if (project.adapter !== decision.adapter) {
+    const adapter = this.getAdapter(project)
+    // Names are compared through the registry, not literally: an adapter
+    // may be registered under an alias (`coo-missions` / `techpulse-coo`),
+    // and a decision recorded under one must still apply to a project
+    // configured with the other.
+    if (
+      project.adapter !== decision.adapter &&
+      this.registry[decision.adapter] !== adapter
+    ) {
       throw new Error(
         `decision ${decision.id} is for adapter '${decision.adapter}' but project '${project.name}' uses '${project.adapter}'`,
       )
     }
-    const adapter = this.getAdapter(project)
 
     const run = this.log.createRun({
       routine: 'adapter:apply-decision',
