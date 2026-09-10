@@ -172,6 +172,7 @@ describe('reconcileGithubDecisions', () => {
         labels: [{ name: DECISION_LABEL }, { name: APPROVE_LABEL }],
       }),
     ])
+    calls.length = 0
     const applied: string[] = []
     const out = await reconcileGithubDecisions(
       ctx,
@@ -182,7 +183,7 @@ describe('reconcileGithubDecisions', () => {
     )
     expect(applied).toEqual(['d1:approved'])
     expect(out.resolved).toEqual([{ decisionId: 'd1', status: 'approved' }])
-    expect(calls).toEqual(['close #5: Approved via GitHub'])
+    expect(calls).toEqual(['labels', 'close #5: Approved via GitHub'])
   })
 
   it('leaves an issue open while nobody has decided, and closes one decided elsewhere', async () => {
@@ -190,7 +191,7 @@ describe('reconcileGithubDecisions', () => {
     const { port, calls } = fakePort([issue(5, 'd1'), issue(6, 'd2')])
     const out = await reconcileGithubDecisions(ctx, async () => {}, port)
     expect(out.resolved).toEqual([])
-    expect(calls).toEqual(['close #6: Decided elsewhere: rejected'])
+    expect(calls).toEqual(['labels', 'close #6: Decided elsewhere: rejected'])
   })
 
   it('does nothing for a remote that is not on GitHub', async () => {

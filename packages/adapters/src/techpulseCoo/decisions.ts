@@ -182,8 +182,12 @@ export async function reconcileGithubDecisions(
     .listDecisions()
     .filter((d) => d.project === ctx.project.name && d.ref)
 
+  if (mine.length === 0) return outcome
+
   let issues: GithubIssue[]
   try {
+    // Labels first: listing by a label that does not exist yet is an error.
+    await port.ensureLabels(repo)
     issues = await port.listIssues(repo)
   } catch (err) {
     ctx.log.append({
@@ -202,14 +206,9 @@ export async function reconcileGithubDecisions(
     if (id) byDecision.set(id, issue)
   }
 
-  let labelsEnsured = false
   for (const decision of mine) {
     const issue = byDecision.get(decision.id)
     if (decision.status === 'pending' && !issue) {
-      if (!labelsEnsured) {
-        await port.ensureLabels(repo)
-        labelsEnsured = true
-      }
       const number = await port.createIssue(
         repo,
         `Decide: ${decision.title}`,
