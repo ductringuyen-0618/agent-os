@@ -12,6 +12,7 @@ import type {
   ListWorkflowsQuery,
   Message,
   ProjectListItem,
+  ProjectSetupOutcome,
   RoutineConfig,
   Run,
   RunStatus,
@@ -198,6 +199,12 @@ export class ApiClient {
     build?: boolean
   }) {
     return this.req<AddProjectResponse>('POST', '/api/projects', input)
+  }
+  setupProject(name: string) {
+    return this.req<{ setup: ProjectSetupOutcome; project?: ProjectListItem }>(
+      'POST',
+      `/api/projects/${name}/setup`,
+    )
   }
   removeProject(name: string) {
     return this.req<{ ok: true }>('DELETE', `/api/projects/${name}`)

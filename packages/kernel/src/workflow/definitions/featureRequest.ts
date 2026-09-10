@@ -67,6 +67,10 @@ function requireFeatureRequestOps(
   deps: FeatureRequestDeps,
   project: ProjectConfig,
 ) {
+  if (!project.adapter)
+    throw new Error(
+      `project '${project.name}' is not set up yet: merge its setup pull request first`,
+    )
   const adapter = deps.registry[project.adapter]
   if (!adapter)
     throw new Error(`no adapter registered for '${project.adapter}'`)

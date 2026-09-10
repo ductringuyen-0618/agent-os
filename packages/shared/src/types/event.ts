@@ -17,6 +17,7 @@ export type EventType =
   | 'schedule.created'
   | 'git.commit'
   | 'git.push'
+  | 'project.ready'
   | 'ops.alert'
   | 'security.redacted'
   | `custom.${string}`

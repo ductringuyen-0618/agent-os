@@ -41,6 +41,31 @@ export function registerProjectCrudRoutes(
     }
   })
 
+  // Re-runs setup for a pending project: activates the adapter if the setup
+  // pull request is merged, opens the PR if none exists yet. Idempotent.
+  app.post<{ Params: { name: string } }>(
+    '/api/projects/:name/setup',
+    async (req, reply) => {
+      try {
+        const setup = await deps.projects.runSetup(req.params.name)
+        const item = (await deps.projects.listProjects()).find(
+          (p) => p.config.name === req.params.name,
+        )
+        return { setup, project: item }
+      } catch (err) {
+        if (err instanceof ProjectNotFoundError) {
+          return reply.code(404).send({ error: err.message })
+        }
+        if (err instanceof GhUnavailableError) {
+          return reply
+            .code(503)
+            .send({ error: 'gh not available', hint: err.hint })
+        }
+        throw err
+      }
+    },
+  )
+
   app.delete<{ Params: { name: string } }>(
     '/api/projects/:name',
     async (req, reply) => {

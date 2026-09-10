@@ -18,6 +18,7 @@ import {
   setProposalStatus,
   writeReport,
 } from './requests.js'
+import { cooSetup } from './setup.js'
 
 interface TechpulseCooOptions {
   proposals_path: string
@@ -312,6 +313,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
       throw err
     }
   },
+  setup: cooSetup,
   featureRequests: {
     bootstrapLayout: bootstrapCooLayout,
     pushProposal,

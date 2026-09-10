@@ -11,6 +11,30 @@ export interface AdapterContext {
   runId?: string
 }
 
+export interface ProjectSetupResult {
+  /** Empty when no pull request was opened (see `skipped` / `applied`). */
+  url: string
+  number: number
+  /** Nothing to do: the repo already carries the adapter's layout. */
+  skipped?: string
+  /** The layout was committed straight to base_branch (no PR host, e.g. a local remote). */
+  applied?: boolean
+}
+
+/**
+ * How an adapter gets itself set up in a freshly connected repo. Adding a
+ * project no longer assumes an adapter: agent-os opens a pull request that
+ * adds what the adapter needs and activates it once that lands.
+ */
+export interface ProjectSetupOps {
+  /** `options` to write into the project yaml when the adapter goes live. */
+  defaultOptions: Record<string, unknown>
+  /** True when base_branch already carries everything the adapter needs. */
+  isReady(ctx: AdapterContext): Promise<boolean>
+  /** Adds what is missing on a setup branch and opens a PR for it. */
+  openSetupPr(ctx: AdapterContext): Promise<ProjectSetupResult>
+}
+
 export interface SyncResult {
   added: string[]
   changed: string[]
@@ -103,4 +127,6 @@ export interface ProjectAdapter {
   sync(ctx: AdapterContext): Promise<SyncResult>
   applyDecision(decision: Decision, ctx: AdapterContext): Promise<void>
   featureRequests?: FeatureRequestAdapterOps
+  /** Absent means the adapter needs nothing from the repo and activates on add. */
+  setup?: ProjectSetupOps
 }

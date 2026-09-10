@@ -80,8 +80,9 @@ export function NewRequestForm({
         >
           {projects.length === 0 && <option value="">No projects yet</option>}
           {projects.map((p) => (
-            <option key={p.name} value={p.name}>
+            <option key={p.name} value={p.name} disabled={!p.adapter}>
               {p.name}
+              {p.adapter ? '' : ' (not set up yet)'}
             </option>
           ))}
         </select>
