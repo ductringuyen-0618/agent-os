@@ -23,6 +23,8 @@ export interface RoutineConfig {
   agent?: string
   every?: string
   cron?: string
+  /** Scope a skill routine to a project: its clone is readable and the payload carries its state. */
+  project?: string
   on?: EventType[]
   after?: string[]
   model?: string

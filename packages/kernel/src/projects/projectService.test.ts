@@ -262,7 +262,7 @@ describe('ProjectService.listProjects', () => {
 
     expect(list).toHaveLength(1)
     expect(list[0].config.name).toBe('widgets')
-    expect(list[0].routines).toEqual(['widgets-sync'])
+    expect(list[0].routines).toEqual(['widgets-sync', 'widgets-coo'])
     expect(list[0].lastSync?.status).toBe('success')
     expect(list[0].hasCooLayout).toBe(false)
   })

@@ -109,7 +109,16 @@ export function buildServer(kernel: Kernel): FastifyInstance {
     async (): Promise<HealthResponse> => ({ ok: true, version: VERSION }),
   )
 
-  registerInternalRoutes(app, { log, wiki, scheduler, osRoot: cfg.osRoot })
+  registerInternalRoutes(app, {
+    log,
+    wiki,
+    scheduler,
+    osRoot: cfg.osRoot,
+    workflows: kernel.workflows,
+    loadProjects: kernel.adapters
+      ? () => kernel.adapters.loadProjects()
+      : undefined,
+  })
   registerWikiRoutes(app, wiki ?? new WikiService(cfg.osRoot, log))
   registerSkillRoutes(app, { osRoot: cfg.osRoot, log, scheduler })
   registerWorkflowRoutes(app, { engine: kernel.workflows, log })

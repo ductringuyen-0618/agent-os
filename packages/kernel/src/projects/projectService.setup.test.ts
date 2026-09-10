@@ -156,7 +156,7 @@ describe('ProjectService setup via pull request', () => {
     expect(list[0].config.adapter).toBe('coo-missions')
     expect(list[0].config.setup?.status).toBe('ready')
     expect(list[0].config.setup?.pr_number).toBe(7)
-    expect(list[0].routines).toEqual(['widgets-sync'])
+    expect(list[0].routines).toEqual(['widgets-sync', 'widgets-coo'])
     expect(readFileSync(path.join(osRoot, 'routines.yaml'), 'utf8')).toContain(
       'widgets-sync',
     )

@@ -16,6 +16,10 @@ import { writeRunMcpConfig } from './process/mcpConfig.js'
 import { ProcessManager } from './process/processManager.js'
 import { assemblePrompt } from './process/promptAssembler.js'
 import { ProjectService } from './projects/projectService.js'
+import {
+  type ProjectRoutineContext,
+  buildProjectContext,
+} from './routines/projectContext.js'
 import { Scheduler } from './scheduler/scheduler.js'
 import { WikiService } from './wiki/wikiService.js'
 import { WorkflowEngine } from './workflow/engine.js'
@@ -106,6 +110,25 @@ class KernelImpl implements Kernel {
       throw new Error(`no running Run found for routine ${routine.name}`)
     }
 
+    // A project-scoped routine sees the project's clone and is told what is
+    // already in flight for it, so it can hold instead of piling on.
+    let projectCtx: ProjectRoutineContext | undefined
+    if (routine.project) {
+      const project = (await this.adapters.loadProjects()).find(
+        (p) => p.name === routine.project,
+      )
+      if (!project) {
+        throw new Error(
+          `routine ${routine.name}: unknown project '${routine.project}'`,
+        )
+      }
+      projectCtx = buildProjectContext(
+        project,
+        this.log.listDecisions(),
+        this.workflows.list({ project: project.name }),
+      )
+    }
+
     const task =
       routine.skill === 'heartbeat'
         ? JSON.stringify({
@@ -121,7 +144,7 @@ class KernelImpl implements Kernel {
                   : null,
               })),
           })
-        : JSON.stringify(payload ?? {})
+        : JSON.stringify({ ...(payload ?? {}), ...(projectCtx ?? {}) })
 
     const assembled = await assemblePrompt({
       osRoot: this.cfg.osRoot,
@@ -149,7 +172,7 @@ class KernelImpl implements Kernel {
       model: routine.model ?? defaults.model,
       permissionMode: routine.permission_mode ?? defaults.permission_mode,
       allowedTools: routine.allowed_tools ?? defaults.allowed_tools,
-      addDirs: [this.cfg.osRoot],
+      addDirs: [this.cfg.osRoot, ...(projectCtx ? [projectCtx.clone] : [])],
       mcpConfigPath,
       timeoutMs: routine.timeout_ms ?? defaults.timeout_ms,
     }

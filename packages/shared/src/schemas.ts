@@ -125,6 +125,7 @@ export const RoutineConfigSchema = z
     agent: z.string().optional(),
     every: z.string().optional(),
     cron: z.string().optional(),
+    project: z.string().optional(),
     on: z.array(EventTypeSchema).optional(),
     after: z.array(z.string()).optional(),
     model: z.string().optional(),
