@@ -11,6 +11,7 @@ const COLORS: Record<string, string> = {
   pending: 'text-signal',
   approved: 'text-success',
   rejected: 'text-danger',
+  expired: 'text-muted',
   error: 'text-danger',
   waiting: 'text-signal',
   sleeping: 'text-muted',

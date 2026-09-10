@@ -110,6 +110,11 @@ export function RequestView({ workflowId }: { workflowId: string }) {
   const { workflow, steps } = detail
   const idx = currentStepIndex(workflow, steps)
   const activeStep = idx >= 0 ? steps[idx] : undefined
+  // The engine keeps the await-approval step's decision.resolved payload in
+  // the instance state, so the verdict survives without an extra fetch.
+  const verdict = (
+    workflow.state?.['await-approval'] as { status?: string } | undefined
+  )?.status
 
   return (
     <div className="flex flex-col gap-4">
@@ -182,7 +187,22 @@ export function RequestView({ workflowId }: { workflowId: string }) {
           under Decisions; the build starts the moment you approve.
         </p>
       )}
+      {workflow.status === 'succeeded' && verdict === 'rejected' && (
+        <p className="rounded-md border border-border px-3 py-2 text-xs text-muted">
+          Rejected. The proposal is marked rejected in {workflow.project}'s repo
+          and nothing was built.
+        </p>
+      )}
+      {workflow.status === 'succeeded' && verdict === 'expired' && (
+        <p className="rounded-md border border-border px-3 py-2 text-xs text-muted">
+          Expired: nobody decided within 7 days. The proposal stays on file as
+          expired so it is not proposed again, and nothing was built. Edit its
+          status back to proposed in the repo to revive it.
+        </p>
+      )}
       {workflow.status === 'succeeded' &&
+        verdict !== 'rejected' &&
+        verdict !== 'expired' &&
         !steps.some((s) => s.name === 'build') && (
           <p className="rounded-md border border-border px-3 py-2 text-xs text-muted">
             Approved and pushed, but not built here: {workflow.project} has no

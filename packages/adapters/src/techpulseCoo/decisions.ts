@@ -9,12 +9,26 @@ import { ghInvoke } from './requests.js'
  * resolves it. Nothing here needs the dashboard, a tunnel, or any inbound
  * connection: the daemon polls GitHub on every sync, and the human decides
  * from the GitHub app with their own login.
+ *
+ * Silence has a policy too: a decision nobody has made after 3 and again
+ * after 6 days gets a reminder comment on its issue (GitHub emails it), and
+ * after 7 days it expires -- the proposal is marked `expired` in the repo,
+ * the issue closes, and the project's COO is free to propose something
+ * else. Every reminder carries a marker so the cloud COO, which follows the
+ * same protocol, and this sync never post the same one twice.
  */
 
 export const DECISION_LABEL = 'agentos:decision'
 export const APPROVE_LABEL = 'agentos:approve'
 export const REJECT_LABEL = 'agentos:reject'
+/** Days of silence after which a reminder is posted, in order. */
+export const NUDGE_AFTER_DAYS: readonly number[] = [3, 6]
+/** Days of silence after which a pending decision expires. */
+export const EXPIRE_AFTER_DAYS = 7
+const DAY_MS = 24 * 60 * 60 * 1000
 const MARKER = /<!--\s*agentos:decision\s+([^>]*?)\s*-->/
+
+export type Verdict = 'approved' | 'rejected' | 'expired'
 
 export interface GithubIssue {
   number: number
@@ -33,6 +47,7 @@ export interface GithubDecisionPort {
     body: string,
     labels: string[],
   ): Promise<number>
+  commentIssue(repo: string, number: number, body: string): Promise<void>
   closeIssue(repo: string, number: number, comment: string): Promise<void>
   ensureLabels(repo: string): Promise<void>
 }
@@ -71,6 +86,17 @@ export const ghDecisionPort: GithubDecisionPort = {
     const url = result.stdout.trim().split('\n').pop() ?? ''
     const m = /\/issues\/(\d+)/.exec(url)
     return m ? Number(m[1]) : 0
+  },
+  async commentIssue(repo, number, body) {
+    await ghInvoke([
+      'issue',
+      'comment',
+      String(number),
+      '--repo',
+      repo,
+      '--body',
+      body,
+    ])
   },
   async closeIssue(repo, number, comment) {
     await ghInvoke([
@@ -137,11 +163,57 @@ export function issueBody(decision: Decision, project: string): string {
     'or reply with a comment that is just `approve` or `reject`. agent-os picks',
     'it up on its next sync (hourly), rewrites the proposal, closes this issue,',
     'and an approval is built on the next COO fire. Any other comment is ignored.',
+    `Undecided after ${EXPIRE_AFTER_DAYS} days, it expires and a different idea takes its place.`,
     '',
     '---',
     '',
     decision.body,
   ].join('\n')
+}
+
+/** Hidden marker on the n-th reminder comment; both sides look for it before posting. */
+export function nudgeMarker(n: number): string {
+  return `<!-- agentos:nudge n=${n} -->`
+}
+
+export function nudgeBody(
+  decision: Decision,
+  n: number,
+  daysLeft: number,
+): string {
+  const when =
+    daysLeft <= 1 ? 'It expires tomorrow' : `It expires in ${daysLeft} days`
+  return [
+    nudgeMarker(n),
+    `Still waiting on your decision for **${decision.title}**. ${when} unless you`,
+    'add the label `agentos:approve` / `agentos:reject` or reply `approve` / `reject`.',
+    '',
+    '---',
+    '',
+    decision.body,
+  ].join('\n')
+}
+
+export function hasNudge(issue: GithubIssue, n: number): boolean {
+  const marker = nudgeMarker(n)
+  return issue.comments.some((c) => c.body?.includes(marker))
+}
+
+/** Whole days since the decision was raised. */
+export function ageDays(decision: Decision, now: number): number {
+  const created = Date.parse(decision.createdAt)
+  if (Number.isNaN(created)) return 0
+  return Math.floor((now - created) / DAY_MS)
+}
+
+/** Which reminders are due for a decision this old and not yet posted. */
+export function dueNudges(issue: GithubIssue, age: number): number[] {
+  const due: number[] = []
+  NUDGE_AFTER_DAYS.forEach((days, i) => {
+    const n = i + 1
+    if (age >= days && !hasNudge(issue, n)) due.push(n)
+  })
+  return due
 }
 
 const YES = /^\s*(approve|approved|yes|lgtm|ship it)\b/i
@@ -169,38 +241,70 @@ export function verdictOf(
 
 export interface GithubDecisionOutcome {
   opened: number[]
-  resolved: Array<{ decisionId: string; status: 'approved' | 'rejected' }>
+  resolved: Array<{ decisionId: string; status: Verdict }>
   closed: number[]
+  /** Reminder comments posted this pass, by issue and reminder number. */
+  nudged: Array<{ issue: number; n: number }>
 }
 
 function isGithub(repo: string): boolean {
   return /github\.com[/:]/.test(repo)
 }
 
+function emptyOutcome(): GithubDecisionOutcome {
+  return { opened: [], resolved: [], closed: [], nudged: [] }
+}
+
+function expiryComment(): string {
+  return `No decision in ${EXPIRE_AFTER_DAYS} days: expired. agent-os keeps this idea on file so it is not proposed again, and proposes something different next. To bring it back, edit the proposal's status to \`proposed\` on main.`
+}
+
 /**
  * One pass, called from sync: open issues for pending decisions that have
- * none, resolve decisions whose issue carries a verdict, close issues whose
- * decision was resolved elsewhere (the dashboard, a status edit).
- * `apply` performs the resolution the same way the dashboard does.
+ * none, resolve decisions whose issue carries a verdict, remind about and
+ * expire the ones nobody decides, close issues whose decision was resolved
+ * elsewhere (the dashboard, a status edit). `apply` performs the
+ * resolution the same way the dashboard does. Expiry does not need GitHub,
+ * so a project on any other remote still gets it.
  */
 export async function reconcileGithubDecisions(
   ctx: AdapterContext,
-  apply: (decision: Decision, status: 'approved' | 'rejected') => Promise<void>,
+  apply: (decision: Decision, status: Verdict) => Promise<void>,
   port: GithubDecisionPort = ghDecisionPort,
+  now: number = Date.now(),
 ): Promise<GithubDecisionOutcome> {
-  const outcome: GithubDecisionOutcome = {
-    opened: [],
-    resolved: [],
-    closed: [],
-  }
-  if (!isGithub(ctx.project.repo)) return outcome
-  const repo = repoSlug(ctx.project.repo)
-  const owner = repo.split('/')[0]
+  const outcome = emptyOutcome()
   const mine = ctx.log
     .listDecisions()
     .filter((d) => d.project === ctx.project.name && d.ref)
-
   if (mine.length === 0) return outcome
+
+  const expire = async (decision: Decision): Promise<void> => {
+    await apply(decision, 'expired')
+    outcome.resolved.push({ decisionId: decision.id, status: 'expired' })
+    ctx.log.append({
+      type: 'custom.decision.expired',
+      runId: ctx.runId,
+      payload: {
+        decisionId: decision.id,
+        ref: decision.ref,
+        ageDays: ageDays(decision, now),
+      },
+    })
+  }
+
+  if (!isGithub(ctx.project.repo)) {
+    for (const decision of mine) {
+      if (
+        decision.status === 'pending' &&
+        ageDays(decision, now) >= EXPIRE_AFTER_DAYS
+      )
+        await expire(decision)
+    }
+    return outcome
+  }
+  const repo = repoSlug(ctx.project.repo)
+  const owner = repo.split('/')[0]
 
   let issues: GithubIssue[]
   try {
@@ -236,7 +340,12 @@ export async function reconcileGithubDecisions(
     const issue =
       byDecision.get(decision.id) ??
       (decision.ref ? byRef.get(decision.ref) : undefined)
+    const age = ageDays(decision, now)
     if (decision.status === 'pending' && !issue) {
+      if (age >= EXPIRE_AFTER_DAYS) {
+        await expire(decision)
+        continue
+      }
       const number = await port.createIssue(
         repo,
         `Decide: ${decision.title}`,
@@ -254,17 +363,38 @@ export async function reconcileGithubDecisions(
     if (!issue || issue.state.toUpperCase() !== 'OPEN') continue
     if (decision.status === 'pending') {
       const verdict = verdictOf(issue, owner)
-      if (!verdict) continue
-      await apply(decision, verdict)
-      outcome.resolved.push({ decisionId: decision.id, status: verdict })
-      await port.closeIssue(
-        repo,
-        issue.number,
-        verdict === 'approved'
-          ? 'Approved via GitHub. agent-os rewrote the proposal to `approved`; the build starts on the next COO fire.'
-          : 'Rejected via GitHub. agent-os rewrote the proposal to `rejected`.',
-      )
-      outcome.closed.push(issue.number)
+      if (verdict) {
+        await apply(decision, verdict)
+        outcome.resolved.push({ decisionId: decision.id, status: verdict })
+        await port.closeIssue(
+          repo,
+          issue.number,
+          verdict === 'approved'
+            ? 'Approved via GitHub. agent-os rewrote the proposal to `approved`; the build starts on the next COO fire.'
+            : 'Rejected via GitHub. agent-os rewrote the proposal to `rejected`.',
+        )
+        outcome.closed.push(issue.number)
+        continue
+      }
+      if (age >= EXPIRE_AFTER_DAYS) {
+        await expire(decision)
+        await port.closeIssue(repo, issue.number, expiryComment())
+        outcome.closed.push(issue.number)
+        continue
+      }
+      for (const n of dueNudges(issue, age)) {
+        await port.commentIssue(
+          repo,
+          issue.number,
+          nudgeBody(decision, n, EXPIRE_AFTER_DAYS - age),
+        )
+        outcome.nudged.push({ issue: issue.number, n })
+        ctx.log.append({
+          type: 'custom.decision.nudge',
+          runId: ctx.runId,
+          payload: { decisionId: decision.id, issue: issue.number, n },
+        })
+      }
     } else {
       await port.closeIssue(
         repo,

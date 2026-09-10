@@ -97,6 +97,9 @@ function fakePort(issues: GithubIssue[]) {
       expect(body).toContain('<!-- agentos:decision')
       return 41
     },
+    commentIssue: async (_repo, number, body) => {
+      calls.push(`comment #${number}: ${body.split('\n')[0]}`)
+    },
     closeIssue: async (_repo, number, comment) => {
       calls.push(`close #${number}: ${comment.split('.')[0]}`)
     },
@@ -105,6 +108,12 @@ function fakePort(issues: GithubIssue[]) {
     },
   }
   return { port, calls }
+}
+
+const DAY = 24 * 60 * 60 * 1000
+/** `now` such that a decision created at the fixture's createdAt is `days` old. */
+function daysLater(days: number): number {
+  return Date.parse('2026-09-10T00:00:00Z') + days * DAY + 60_000
 }
 
 describe('verdictOf', () => {
@@ -229,12 +238,139 @@ describe('reconcileGithubDecisions', () => {
     expect(calls).toEqual(['labels', 'close #9: Approved via GitHub'])
   })
 
+  it('posts the first reminder after 3 days and only once', async () => {
+    const { ctx, events } = makeCtx([decision('d1')])
+    const open = issue(5, 'd1')
+    const { port, calls } = fakePort([open])
+    const out = await reconcileGithubDecisions(
+      ctx,
+      async () => {},
+      port,
+      daysLater(3),
+    )
+    expect(out.nudged).toEqual([{ issue: 5, n: 1 }])
+    expect(calls).toEqual(['labels', 'comment #5: <!-- agentos:nudge n=1 -->'])
+    expect(events.map((e) => e.type)).toContain('custom.decision.nudge')
+
+    // The same reminder is on the issue now (posted by us or by the cloud COO).
+    open.comments.push({
+      author: { login: 'octo' },
+      body: '<!-- agentos:nudge n=1 -->\nStill waiting',
+    })
+    calls.length = 0
+    const again = await reconcileGithubDecisions(
+      ctx,
+      async () => {},
+      port,
+      daysLater(4),
+    )
+    expect(again.nudged).toEqual([])
+    expect(calls).toEqual(['labels'])
+  })
+
+  it('posts the second reminder after 6 days, catching up if the first was missed', async () => {
+    const { ctx } = makeCtx([decision('d1')])
+    const { port, calls } = fakePort([issue(5, 'd1')])
+    const out = await reconcileGithubDecisions(
+      ctx,
+      async () => {},
+      port,
+      daysLater(6),
+    )
+    expect(out.nudged).toEqual([
+      { issue: 5, n: 1 },
+      { issue: 5, n: 2 },
+    ])
+    expect(calls).toEqual([
+      'labels',
+      'comment #5: <!-- agentos:nudge n=1 -->',
+      'comment #5: <!-- agentos:nudge n=2 -->',
+    ])
+  })
+
+  it('expires an undecided decision after 7 days and closes its issue', async () => {
+    const { ctx, events } = makeCtx([decision('d1')])
+    const { port, calls } = fakePort([issue(5, 'd1')])
+    const applied: string[] = []
+    const out = await reconcileGithubDecisions(
+      ctx,
+      async (d, status) => {
+        applied.push(`${d.id}:${status}`)
+      },
+      port,
+      daysLater(7),
+    )
+    expect(applied).toEqual(['d1:expired'])
+    expect(out.resolved).toEqual([{ decisionId: 'd1', status: 'expired' }])
+    expect(out.nudged).toEqual([])
+    expect(calls).toEqual([
+      'labels',
+      'close #5: No decision in 7 days: expired',
+    ])
+    expect(events.map((e) => e.type)).toContain('custom.decision.expired')
+  })
+
+  it('lets a late verdict win over expiry', async () => {
+    const { ctx } = makeCtx([decision('d1')])
+    const { port, calls } = fakePort([
+      issue(5, 'd1', {
+        comments: [{ author: { login: 'octo' }, body: 'approve' }],
+      }),
+    ])
+    const applied: string[] = []
+    await reconcileGithubDecisions(
+      ctx,
+      async (d, status) => {
+        applied.push(`${d.id}:${status}`)
+      },
+      port,
+      daysLater(9),
+    )
+    expect(applied).toEqual(['d1:approved'])
+    expect(calls).toEqual(['labels', 'close #5: Approved via GitHub'])
+  })
+
+  it('expires a stale pending decision that never got an issue instead of opening one', async () => {
+    const { ctx } = makeCtx([decision('d1')])
+    const { port, calls } = fakePort([])
+    const applied: string[] = []
+    const out = await reconcileGithubDecisions(
+      ctx,
+      async (d, status) => {
+        applied.push(`${d.id}:${status}`)
+      },
+      port,
+      daysLater(8),
+    )
+    expect(applied).toEqual(['d1:expired'])
+    expect(out.opened).toEqual([])
+    expect(calls).toEqual(['labels'])
+  })
+
   it('does nothing for a remote that is not on GitHub', async () => {
     const { ctx } = makeCtx([decision('d1')], '/tmp/bare.git')
     const { port, calls } = fakePort([])
     const out = await reconcileGithubDecisions(ctx, async () => {}, port)
-    expect(out).toEqual({ opened: [], resolved: [], closed: [] })
+    expect(out).toEqual({ opened: [], resolved: [], closed: [], nudged: [] })
     expect(calls).toEqual([])
+  })
+
+  it('still expires a stale decision on a remote that is not on GitHub', async () => {
+    const { ctx, events } = makeCtx([decision('d1')], '/tmp/bare.git')
+    const { port, calls } = fakePort([])
+    const applied: string[] = []
+    const out = await reconcileGithubDecisions(
+      ctx,
+      async (d, status) => {
+        applied.push(`${d.id}:${status}`)
+      },
+      port,
+      daysLater(7),
+    )
+    expect(applied).toEqual(['d1:expired'])
+    expect(out.resolved).toEqual([{ decisionId: 'd1', status: 'expired' }])
+    expect(calls).toEqual([])
+    expect(events.map((e) => e.type)).toContain('custom.decision.expired')
   })
 
   it('alerts instead of throwing when GitHub is unreachable', async () => {
@@ -244,6 +380,7 @@ describe('reconcileGithubDecisions', () => {
         throw new Error('gh: HTTP 502')
       },
       createIssue: async () => 0,
+      commentIssue: async () => {},
       closeIssue: async () => {},
       ensureLabels: async () => {},
     }

@@ -30,6 +30,11 @@ has something of yours to decide or a build is in progress. Do nothing:
 reply with one line saying you are waiting, and stop. Do not "improve" the
 open request, do not add a second one.
 
+A proposal nobody decides on is reminded about after 3 and 6 days and
+`expired` after 7: its decision resolves, the idea stays on file, and the
+next fire is free to propose something else. Expired and rejected titles
+are in `recentTitles`: never bring one back under a new name.
+
 ## Steps
 1. `mcp__agentos__get_context`, then `mcp__agentos__read_wiki` for
    `projects/<project>/overview.md` and `projects/<project>/state.md` if

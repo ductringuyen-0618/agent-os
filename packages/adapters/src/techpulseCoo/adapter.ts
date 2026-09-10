@@ -10,6 +10,27 @@ import type { Decision } from '@agentos/shared'
 import simpleGit from 'simple-git'
 import { reconcileGithubDecisions } from './decisions.js'
 import { readStatus, setStatus } from './frontmatter.js'
+
+/** A status a human (or the expiry clock) can move a `proposed` proposal to. */
+type Verdict = 'approved' | 'rejected' | 'expired'
+const VERDICTS: ReadonlySet<string> = new Set([
+  'approved',
+  'rejected',
+  'expired',
+])
+function isVerdict(status: string): status is Verdict {
+  return VERDICTS.has(status)
+}
+const VERB: Record<Verdict, string> = {
+  approved: 'approve',
+  rejected: 'reject',
+  expired: 'expire',
+}
+const TITLE: Record<Verdict, string> = {
+  approved: 'Approved',
+  rejected: 'Rejected',
+  expired: 'Expired',
+}
 import {
   bootstrapCooLayout,
   markShipped,
@@ -217,10 +238,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
         // The human decided in the repo itself (GitHub's editor, a phone):
         // honour it as if the dashboard button had been pressed. The file
         // already carries the status, so only the Decision needs resolving.
-        if (
-          oldStatus === 'proposed' &&
-          (newStatus === 'approved' || newStatus === 'rejected')
-        ) {
+        if (oldStatus === 'proposed' && isVerdict(newStatus)) {
           const pending = ctx.log
             .listDecisions()
             .find((d) => d.ref === destRel && d.status === 'pending')
@@ -282,12 +300,14 @@ export const techpulseCooAdapter: ProjectAdapter = {
         path.basename(file),
       )
       const content = await readFile(filePath, 'utf8')
-      const targetStatus =
-        decision.status === 'rejected' ? 'rejected' : 'approved'
+      const targetStatus: Verdict =
+        decision.status === 'rejected' || decision.status === 'expired'
+          ? decision.status
+          : 'approved'
       await writeFile(filePath, setStatus(content, targetStatus), 'utf8')
 
       const slug = path.basename(file).replace(/\.md$/, '')
-      const verb = targetStatus === 'approved' ? 'approve' : 'reject'
+      const verb = VERB[targetStatus]
       await git.add([path.join(opts.proposals_path, path.basename(file))])
       const subject = `chore(coo): ${verb} ${slug}`
       const commitResult = await git.commit(
@@ -320,7 +340,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
       await mkdir(path.dirname(approvalPath), { recursive: true })
       await writeFile(
         approvalPath,
-        `# ${verb === 'approve' ? 'Approved' : 'Rejected'}: ${slug}\n\n- decision: ${targetStatus}\n- timestamp: ${new Date().toISOString()}\n- commit: ${commitResult.commit}\n`,
+        `# ${TITLE[targetStatus]}: ${slug}\n\n- decision: ${targetStatus}\n- timestamp: ${new Date().toISOString()}\n- commit: ${commitResult.commit}\n`,
         'utf8',
       )
 

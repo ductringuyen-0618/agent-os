@@ -297,4 +297,35 @@ describe('techpulseCooAdapter.sync — decisions made in the repo', () => {
     await techpulseCooAdapter.sync(ctx)
     expect(resolved).toEqual([['d1', 'approved']])
   })
+
+  it('resolves the pending decision as expired when the cloud COO expires the proposal', async () => {
+    const { cloneDir, seedDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+    const resolved: Array<[string, string]> = []
+    // biome-ignore lint/suspicious/noExplicitAny: extend the stub for this test
+    ;(ctx.log as any).resolveDecision = (id: string, status: string) => {
+      resolved.push([id, status])
+    }
+    await techpulseCooAdapter.sync(ctx)
+
+    const seedGit = (await import('simple-git')).default(seedDir)
+    const proposalPath = path.join(
+      seedDir,
+      'docs/missions/coo/proposals/001-dark-mode.md',
+    )
+    writeFileSync(
+      proposalPath,
+      readFileSync(proposalPath, 'utf8').replace(
+        'status: proposed',
+        'status: expired',
+      ),
+    )
+    await seedGit.add('.')
+    await seedGit.commit('chore(coo): expire dark-mode')
+    await seedGit.push('origin', 'main')
+
+    await techpulseCooAdapter.sync(ctx)
+    expect(resolved).toEqual([['d1', 'expired']])
+  })
 })

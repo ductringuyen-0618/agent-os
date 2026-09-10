@@ -76,6 +76,7 @@ export const DecisionStatusSchema = z.enum([
   'pending',
   'approved',
   'rejected',
+  'expired',
   'error',
 ])
 

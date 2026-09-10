@@ -1,4 +1,10 @@
-export type DecisionStatus = 'pending' | 'approved' | 'rejected' | 'error'
+export type DecisionStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  /** Nobody decided within the expiry window; the idea is kept on file, never rebuilt. */
+  | 'expired'
+  | 'error'
 
 export interface Decision {
   id: string

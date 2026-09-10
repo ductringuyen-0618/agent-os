@@ -58,7 +58,10 @@ export interface FeatureRequestDeps {
   ciPollMs?: number
 }
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+// Safety net only: the sync's own expiry clock (adapters decisions.ts) and
+// the cloud COO both expire an undecided proposal after 7 days, which
+// resolves the decision and ends the wait below cleanly.
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 const CI_TIMEOUT_MS = 30 * 60 * 1000
 const CI_POLL_MS = 30 * 1000
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1000
@@ -267,10 +270,19 @@ export function createFeatureRequestWorkflow(
       const decisionRef = `proposals/${path.basename(pushResult.file)}`
 
       if (!ctx.input.autoApprove) {
-        await ctx.step.waitForEvent('await-approval', 'decision.resolved', {
-          match: (e) => e.payload.ref === decisionRef,
-          timeoutMs: SEVEN_DAYS_MS,
-        })
+        const resolved = await ctx.step.waitForEvent<{ status?: string }>(
+          'await-approval',
+          'decision.resolved',
+          {
+            match: (e) => e.payload.ref === decisionRef,
+            timeoutMs: THIRTY_DAYS_MS,
+          },
+        )
+        // A rejection or an expiry ends the request here: the proposal
+        // already carries that status in the repo and nothing gets built.
+        // (The verdict stays readable in state['await-approval'].status.)
+        if (resolved?.status === 'rejected' || resolved?.status === 'expired')
+          return
       }
 
       if (!project.build?.enabled) {
