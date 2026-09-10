@@ -80,6 +80,15 @@ describe('DecisionSchema / MessageSchema / ProjectConfigSchema / EvalCriteriaSch
         createdAt: '2026-09-08T00:00:00.000Z',
       }),
     ).not.toThrow()
+    expect(
+      DecisionSchema.parse({
+        id: 'd2',
+        title: 't',
+        body: 'b',
+        status: 'expired',
+        createdAt: '2026-09-08T00:00:00.000Z',
+      }).status,
+    ).toBe('expired')
     expect(() =>
       MessageSchema.parse({
         id: 'm1',

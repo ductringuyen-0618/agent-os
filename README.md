@@ -93,7 +93,10 @@ node packages/cli/dist/bin.js up --root ./my-os/os
 - **Wiki** (`wiki/`) — LLM-owned memory; the *only* writer is the
   `remember` syscall, which keeps `index.md` and `log.md` in sync.
 - **Decisions** — created by `request_approval`, resolved only by a human
-  via the dashboard or `agentos approve|reject`.
+  via the dashboard, `agentos approve|reject`, or the GitHub issue agent-os
+  opens per decision. One left undecided is nudged on the issue after 3
+  and 6 days and `expired` after 7: kept on file so it is never proposed
+  again, never built.
 - **Adapters** (`packages/adapters`) — `sync()` mirrors an external
   project's state into `raw/`; `applyDecision()` acts on an approved or
   rejected proposal.

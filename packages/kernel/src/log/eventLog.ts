@@ -359,7 +359,7 @@ export class EventLog {
 
   resolveDecision(
     id: string,
-    status: 'approved' | 'rejected' | 'error',
+    status: Exclude<DecisionStatus, 'pending'>,
     error?: string,
   ): Decision {
     const resolvedAt = nowIso()

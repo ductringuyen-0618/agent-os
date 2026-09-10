@@ -187,4 +187,45 @@ describe('AdapterHost.applyDecision — project routing', () => {
       host.applyDecision({ ...decision, project: 'gamma', status: 'approved' }),
     ).rejects.toThrow(/no project named 'gamma'/)
   })
+
+  it('accepts a decision recorded under an alias of the project adapter', async () => {
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    mkdirSync(path.join(osRoot, 'projects'), { recursive: true })
+    writeFileSync(
+      path.join(osRoot, 'projects', 'site.yaml'),
+      'name: site\nadapter: coo-missions\nrepo: x\nclone: /tmp/site\nbase_branch: main\noptions: {}\n',
+    )
+    const cfg = makeCfg(osRoot)
+    const log = new EventLog(cfg.dbPath)
+    const wiki = new WikiService(osRoot, log)
+    const seen: string[] = []
+    const adapter = {
+      name: 'techpulse-coo',
+      sync: async () => ({ added: [], changed: [], events: [] }),
+      // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for Decision/AdapterContext
+      applyDecision: async (d: any) => {
+        seen.push(d.id)
+      },
+    }
+    const other = { ...adapter, name: 'other' }
+    const host = new AdapterHost(cfg, log, wiki, {
+      'coo-missions': adapter,
+      'techpulse-coo': adapter,
+      other,
+    })
+    const decision = log.createDecision({
+      title: 't',
+      body: 'b',
+      adapter: 'techpulse-coo',
+      project: 'site',
+      ref: '001.md',
+    })
+
+    await host.applyDecision({ ...decision, status: 'approved' })
+    expect(seen).toEqual([decision.id])
+
+    await expect(
+      host.applyDecision({ ...decision, adapter: 'other', status: 'approved' }),
+    ).rejects.toThrow(/is for adapter 'other'/)
+  })
 })

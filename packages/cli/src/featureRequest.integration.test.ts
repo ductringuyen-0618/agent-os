@@ -324,6 +324,37 @@ describe('createFeatureRequestWorkflow', () => {
     expect(match({ payload: { ref: decision.ref } })).toBe(true)
   })
 
+  it.each(['rejected', 'expired'] as const)(
+    'ends without building when the decision resolves as %s',
+    async (status) => {
+      const { cloneDir } = await createBareCooRepo()
+      const proj = project(cloneDir, true)
+      kernelDeps.adapters.loadProjects = vi.fn().mockResolvedValue([proj])
+      const def = createFeatureRequestWorkflow(deps)
+      const base = fakeStep(wiki, {})
+      const step = {
+        ...base.step,
+        waitForEvent: async <T>() => ({ status }) as T,
+      }
+      const input: FeatureRequestInput = {
+        project: 'sandbox',
+        title: 'Add dark mode toggle',
+        description: 'Users keep asking.',
+        autoApprove: false,
+      }
+
+      await def.run({
+        id: `wf-${status}`,
+        input,
+        state: {},
+        step,
+        emit: vi.fn(),
+      })
+
+      expect(base.runCalls.map((c) => c.name)).toEqual(['brief'])
+    },
+  )
+
   it('runs the full pipeline through open-pr/done when build is enabled and every check passes', async () => {
     const { bareDir, cloneDir } = await createBareCooRepo()
     const proj = project(cloneDir, true)

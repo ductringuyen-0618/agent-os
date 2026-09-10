@@ -38,7 +38,10 @@ and any private instance built from it.
   `request_approval` only ever creates a `pending` `Decision`; no syscall,
   skill, or agent can flip it to `approved`/`rejected`. That happens only
   through the dashboard's Approve/Reject buttons or the CLI's
-  `agentos approve|reject <id>`, both operated by a human.
+  `agentos approve|reject <id>`, both operated by a human, or the matching
+  label/comment on the decision's GitHub issue by the repo owner. The only
+  non-human transition is `expired`, applied by the kernel's clock after 7
+  undecided days; it never approves anything.
 - It cannot reach the network beyond what `WebFetch`/`WebSearch` or an
   adapter's own HTTP calls do — there is no generic shell/exec tool
   granted to any built-in routine.

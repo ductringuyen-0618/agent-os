@@ -10,6 +10,27 @@ import type { Decision } from '@agentos/shared'
 import simpleGit from 'simple-git'
 import { reconcileGithubDecisions } from './decisions.js'
 import { readStatus, setStatus } from './frontmatter.js'
+
+/** A status a human (or the expiry clock) can move a `proposed` proposal to. */
+type Verdict = 'approved' | 'rejected' | 'expired'
+const VERDICTS: ReadonlySet<string> = new Set([
+  'approved',
+  'rejected',
+  'expired',
+])
+function isVerdict(status: string): status is Verdict {
+  return VERDICTS.has(status)
+}
+const VERB: Record<Verdict, string> = {
+  approved: 'approve',
+  rejected: 'reject',
+  expired: 'expire',
+}
+const TITLE: Record<Verdict, string> = {
+  approved: 'Approved',
+  rejected: 'Rejected',
+  expired: 'Expired',
+}
 import {
   bootstrapCooLayout,
   markShipped,
@@ -107,12 +128,17 @@ async function ensureDecision(
   file: string,
   content: string,
 ): Promise<void> {
+  const project = ctx.project.name
+  // One decision per proposal file per project. Rows written before
+  // decisions recorded their project carry none, so those match on ref.
   const existing = ctx.log
     .listDecisions()
-    .find((d) => d.adapter === 'techpulse-coo' && d.ref === file)
+    .find(
+      (d) =>
+        d.ref === file && (d.project === project || d.project === undefined),
+    )
   const title = extractTitle(content)
   const body = extractDecisionBody(content)
-  const project = ctx.project.name
   if (existing) {
     // A proposal edited while still pending should read the same in the
     // dashboard as in the repo. Resolved decisions keep what was decided on.
@@ -135,7 +161,10 @@ async function ensureDecision(
     title,
     body,
     project,
-    adapter: 'techpulse-coo',
+    // The name this project is configured with (`coo-missions`, or the
+    // legacy `techpulse-coo` alias), so the dashboard's approve/reject
+    // routes the decision back to the same registry entry.
+    adapter: ctx.project.adapter ?? techpulseCooAdapter.name,
     ref: file,
     createdByRun: ctx.runId,
   })
@@ -217,10 +246,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
         // The human decided in the repo itself (GitHub's editor, a phone):
         // honour it as if the dashboard button had been pressed. The file
         // already carries the status, so only the Decision needs resolving.
-        if (
-          oldStatus === 'proposed' &&
-          (newStatus === 'approved' || newStatus === 'rejected')
-        ) {
+        if (oldStatus === 'proposed' && isVerdict(newStatus)) {
           const pending = ctx.log
             .listDecisions()
             .find((d) => d.ref === destRel && d.status === 'pending')
@@ -282,12 +308,14 @@ export const techpulseCooAdapter: ProjectAdapter = {
         path.basename(file),
       )
       const content = await readFile(filePath, 'utf8')
-      const targetStatus =
-        decision.status === 'rejected' ? 'rejected' : 'approved'
+      const targetStatus: Verdict =
+        decision.status === 'rejected' || decision.status === 'expired'
+          ? decision.status
+          : 'approved'
       await writeFile(filePath, setStatus(content, targetStatus), 'utf8')
 
       const slug = path.basename(file).replace(/\.md$/, '')
-      const verb = targetStatus === 'approved' ? 'approve' : 'reject'
+      const verb = VERB[targetStatus]
       await git.add([path.join(opts.proposals_path, path.basename(file))])
       const subject = `chore(coo): ${verb} ${slug}`
       const commitResult = await git.commit(
@@ -320,7 +348,7 @@ export const techpulseCooAdapter: ProjectAdapter = {
       await mkdir(path.dirname(approvalPath), { recursive: true })
       await writeFile(
         approvalPath,
-        `# ${verb === 'approve' ? 'Approved' : 'Rejected'}: ${slug}\n\n- decision: ${targetStatus}\n- timestamp: ${new Date().toISOString()}\n- commit: ${commitResult.commit}\n`,
+        `# ${TITLE[targetStatus]}: ${slug}\n\n- decision: ${targetStatus}\n- timestamp: ${new Date().toISOString()}\n- commit: ${commitResult.commit}\n`,
         'utf8',
       )
 
