@@ -156,8 +156,7 @@ describe('issueBody / issueMarker', () => {
     expect(
       issueMarker({
         ...issue(1, 'x'),
-        body: '<!-- agentos:decision ref=proposals/003-x.md -->
-hi',
+        body: '<!-- agentos:decision ref=proposals/003-x.md -->\nhi',
       }),
     ).toEqual({ ref: 'proposals/003-x.md' })
     expect(issueMarker(issue(1, 'legacy'))).toEqual({ id: 'legacy' })
@@ -213,8 +212,7 @@ describe('reconcileGithubDecisions', () => {
     const { ctx } = makeCtx([decision('d1')])
     const cloudIssue: GithubIssue = {
       ...issue(9, 'ignored'),
-      body: '<!-- agentos:decision ref=proposals/001-idea.md -->
-body',
+      body: '<!-- agentos:decision ref=proposals/001-idea.md -->\nbody',
       labels: [{ name: DECISION_LABEL }, { name: APPROVE_LABEL }],
     }
     const { port, calls } = fakePort([cloudIssue])
