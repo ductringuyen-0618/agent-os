@@ -73,7 +73,7 @@ routines:
     skill: coo-ideate
     agent: coo
     project: techpulse
-    cron: 0 15 * * *
+    cron: 0 9 * * *
     permission_mode: default
     allowed_tools:
       - Read

@@ -82,8 +82,8 @@ export function projectRoutines(name: string): RoutineConfig[] {
       skill: 'coo-ideate',
       agent: 'coo',
       project: name,
-      // 15:00 UTC: one idea a day, early enough to be decided the same day.
-      cron: '0 15 * * *',
+      // 09:00 daemon-local time: one idea a day, on the desk before work starts.
+      cron: '0 9 * * *',
       permission_mode: 'default',
       allowed_tools: [
         'Read',

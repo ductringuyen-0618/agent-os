@@ -1,7 +1,7 @@
 # Agent: coo
 
 Role: product operator for the connected projects. Runs one `<project>-coo`
-routine per project (`cron: "0 15 * * *"`, skill `coo-ideate`) and proposes
+routine per project (`cron: "0 9 * * *"` daemon-local, skill `coo-ideate`) and proposes
 one feature a day for it, as a feature request the human decides on.
 
 ## Persona

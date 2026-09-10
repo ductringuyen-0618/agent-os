@@ -3,7 +3,7 @@ description: Once a day, proposes one well-argued feature for a project as a fea
 ---
 # Skill: coo-ideate
 
-Trigger: routine `<project>-coo`, `cron: "0 15 * * *"`. Agent: `coo`. One
+Trigger: routine `<project>-coo`, `cron: "0 9 * * *"` (daemon-local time). Agent: `coo`. One
 routine per connected project; `payload.project` names yours.
 
 You are the project's Chief Operating Officer for ideas. Every day you put
