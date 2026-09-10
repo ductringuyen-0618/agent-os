@@ -20,6 +20,7 @@ const BUILTIN_EVENT_TYPES = [
   'schedule.created',
   'git.commit',
   'git.push',
+  'project.ready',
   'ops.alert',
   'security.redacted',
 ] as const
@@ -217,14 +218,24 @@ export const ProjectBuildConfigSchema = z.object({
   timeout_ms: z.number().int(),
 })
 
+export const ProjectSetupSchema = z.object({
+  adapter: z.string(),
+  branch: z.string(),
+  status: z.enum(['pending', 'ready']),
+  pr_url: z.string().optional(),
+  pr_number: z.number().int().optional(),
+  note: z.string().optional(),
+})
+
 export const ProjectConfigSchema = z.object({
   name: z.string(),
-  adapter: z.string(),
+  adapter: z.string().optional(),
   repo: z.string(),
   clone: z.string(),
   base_branch: z.string(),
   options: z.record(z.unknown()),
   build: ProjectBuildConfigSchema.optional(),
+  setup: ProjectSetupSchema.optional(),
 })
 
 export const EvalCriteriaSchema = z.object({

@@ -105,8 +105,19 @@ export interface AddProjectRequest {
   build?: boolean
 }
 
+export interface ProjectSetupOutcome {
+  status: 'pending' | 'ready'
+  prUrl?: string
+  prNumber?: number
+  /** Set when no pull request was needed or possible (already set up, non-GitHub remote). */
+  skipped?: string
+  error?: string
+}
+
 export interface AddProjectResponse {
   project: ProjectConfig
   sync: SyncResultShape
   syncError?: string
+  /** Present when the adapter is set up through a pull request rather than immediately. */
+  setup?: ProjectSetupOutcome
 }

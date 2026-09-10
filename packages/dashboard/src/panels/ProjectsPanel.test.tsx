@@ -56,3 +56,29 @@ describe('ProjectsPanel', () => {
     )
   })
 })
+
+describe('ProjectsPanel setup state', () => {
+  it('shows a pending project with its setup PR and a check button, no sync', async () => {
+    installMockFetch({
+      'GET /api/projects': () => [fixtures.pendingProjectListItem],
+    })
+    renderPanel()
+    expect(await screen.findByText('widgets')).toBeInTheDocument()
+    expect(screen.getByText('not set up')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Setup PR #7' })).toHaveAttribute(
+      'href',
+      'https://github.com/octo/widgets/pull/7',
+    )
+    expect(
+      screen.queryByRole('button', { name: /sync now/i }),
+    ).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /check setup/i }))
+    expect(await screen.findByText(/still open/i)).toBeInTheDocument()
+  })
+
+  it('labels the adapter by what it does', async () => {
+    installMockFetch()
+    renderPanel()
+    expect(await screen.findByText('COO missions')).toBeInTheDocument()
+  })
+})

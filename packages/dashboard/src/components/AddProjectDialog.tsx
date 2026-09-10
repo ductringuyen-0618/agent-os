@@ -70,7 +70,18 @@ export function AddProjectDialog({
         base_branch: baseBranch || undefined,
         build,
       })
-      push(`Added ${result.project.name}`)
+      if (result.setup?.status === 'pending' && result.setup.prNumber) {
+        push(
+          `Added ${result.project.name}. Setup PR #${result.setup.prNumber} opened; merge it to activate the adapter.`,
+        )
+      } else if (result.setup?.error) {
+        push(
+          `Added ${result.project.name}, but setup failed: ${result.setup.error}`,
+          'error',
+        )
+      } else {
+        push(`Added ${result.project.name}`)
+      }
       onAdded(result)
       onClose()
     } catch (e) {

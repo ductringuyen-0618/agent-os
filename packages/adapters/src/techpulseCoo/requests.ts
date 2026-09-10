@@ -144,7 +144,7 @@ export async function pushProposal(
   }
 }
 
-function ghInvoke(args: string[]) {
+export function ghInvoke(args: string[]) {
   const bin = process.env.AGENTOS_GH_BIN ?? 'gh'
   // Mirrors ProcessManager's resolveCommand: a fake gh shipped as a plain
   // .js test double has no OS-level executable bit on every platform, so

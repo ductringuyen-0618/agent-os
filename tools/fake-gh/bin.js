@@ -45,8 +45,30 @@ function main() {
     process.exit(0)
   }
 
+  if (argv[0] === 'pr' && argv[1] === 'create') {
+    // `gh pr create --repo owner/name ...` for a project's setup PR.
+    const repoIdx = argv.indexOf('--repo')
+    const repo = repoIdx >= 0 ? argv[repoIdx + 1] : 'owner/name'
+    process.stdout.write(`https://github.com/${repo}/pull/7\n`)
+    process.exit(0)
+  }
+
+  if (argv[0] === 'pr' && argv[1] === 'view') {
+    process.stdout.write(JSON.stringify({ state: process.env.FAKE_GH_PR_STATE ?? 'OPEN' }))
+    process.exit(0)
+  }
+
   if (argv[0] === 'api') {
     const path = argv[1] ?? ''
+    if (path.endsWith('/contents/docs/missions/coo/state.md')) {
+      // FAKE_GH_COO_READY=1 simulates a repo whose setup PR was merged.
+      if (process.env.FAKE_GH_COO_READY !== '1') {
+        process.stderr.write('gh: Not Found (HTTP 404)\n')
+        process.exit(1)
+      }
+      process.stdout.write(Buffer.from('# state', 'utf8').toString('base64'))
+      process.exit(0)
+    }
     if (
       path.endsWith('/contents/package.json') ||
       path.endsWith('/contents/pyproject.toml') ||

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('adds a project from a fake gh repo list and shows the no-COO-layout copy', async ({
+test('adds a project from a fake gh repo list and activates the COO adapter', async ({
   page,
 }) => {
   await page.goto('/')
@@ -15,5 +15,7 @@ test('adds a project from a fake gh repo list and shows the no-COO-layout copy',
   await expect(page.getByRole('alertdialog')).not.toBeVisible()
   const row = page.getByRole('row', { name: /widgets/ })
   await expect(row.getByRole('cell', { name: 'widgets' })).toBeVisible()
-  await expect(row.getByText(/no proposals folder yet/i)).toBeVisible()
+  // The fake gh remote is a local bare repo: no PR host, so the layout is
+  // committed directly and the adapter is live at once.
+  await expect(row.getByText('COO missions')).toBeVisible()
 })

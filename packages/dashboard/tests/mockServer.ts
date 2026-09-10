@@ -96,6 +96,24 @@ export const fixtures = {
     routines: ['techpulse-sync'],
     hasCooLayout: true,
   } satisfies ProjectListItem,
+  pendingProjectListItem: {
+    config: {
+      name: 'widgets',
+      repo: 'https://github.com/octo/widgets.git',
+      clone: '/clones/widgets',
+      base_branch: 'main',
+      options: {},
+      setup: {
+        adapter: 'coo-missions',
+        branch: 'agentos/coo-setup',
+        status: 'pending',
+        pr_url: 'https://github.com/octo/widgets/pull/7',
+        pr_number: 7,
+      },
+    },
+    routines: [],
+    hasCooLayout: false,
+  } satisfies ProjectListItem,
   workflow: {
     id: 'wf_1',
     kind: 'feature-request',
@@ -201,6 +219,14 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
         options: {},
       },
       sync: { added: [], changed: [], events: [], hasCooLayout: false },
+    }),
+    'POST /api/projects/widgets/setup': () => ({
+      setup: {
+        status: 'pending',
+        prUrl: 'https://github.com/octo/widgets/pull/7',
+        prNumber: 7,
+      },
+      project: fixtures.pendingProjectListItem,
     }),
     'DELETE /api/projects/widgets': () => ({ ok: true }),
     'DELETE /api/projects/techpulse': () => ({ ok: true }),

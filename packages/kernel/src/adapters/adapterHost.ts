@@ -71,11 +71,26 @@ export class AdapterHost {
   }
 
   private getAdapter(project: ProjectConfig): ProjectAdapter {
+    if (!project.adapter) {
+      throw new Error(
+        `project '${project.name}' is not set up yet (its setup pull request has not been merged)`,
+      )
+    }
     const adapter = this.registry[project.adapter]
     if (!adapter) {
       throw new Error(`no adapter registered for '${project.adapter}'`)
     }
     return adapter
+  }
+
+  /** The registered adapter by name, for callers that act before a project has one. */
+  getRegistered(name: string): ProjectAdapter | undefined {
+    return this.registry[name]
+  }
+
+  /** An AdapterContext for a project that may not have an adapter yet (setup). */
+  contextFor(project: ProjectConfig, runId?: string): AdapterContext {
+    return { cfg: this.cfg, log: this.log, wiki: this.wiki, project, runId }
   }
 
   async sync(projectName: string, runId?: string): Promise<SyncResult> {

@@ -16,6 +16,10 @@
     "./wiki/redact": {
       "types": "./dist/wiki/redact.d.ts",
       "import": "./dist/wiki/redact.js"
+    },
+    "./github/gh": {
+      "types": "./dist/github/gh.d.ts",
+      "import": "./dist/github/gh.js"
     }
   },
   "scripts": {
