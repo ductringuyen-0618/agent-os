@@ -226,7 +226,8 @@ beforeEach(async () => {
         const projects = await kernelDeps.adapters.loadProjects()
         const proj = projects.find((p) => p.name === name)
         if (!proj) throw new Error(`unknown project '${name}'`)
-        const adapter = registry[proj.adapter]
+        const adapter = registry[proj.adapter ?? '']
+        if (!adapter) throw new Error(`project '${name}' has no adapter`)
         return adapter.sync({ cfg: kernelDeps.cfg, log, wiki, project: proj })
       },
     },
