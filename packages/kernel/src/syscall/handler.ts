@@ -1,6 +1,10 @@
 // packages/kernel/src/syscall/handler.ts
-import type { EventType } from '@agentos/shared'
+import type { EventType, ProjectConfig } from '@agentos/shared'
 import type { EventLog } from '../log/eventLog.js'
+import {
+  buildProjectContext,
+  projectHasIdeaInFlight,
+} from '../routines/projectContext.js'
 import type { Scheduler } from '../scheduler/scheduler.js'
 import { SecretDetectedError } from '../wiki/redact.js'
 import type { WikiService } from '../wiki/wikiService.js'
@@ -13,6 +17,22 @@ export interface SyscallContext {
   log: EventLog
   wiki: WikiService
   scheduler: Scheduler
+  /** Needed by propose_feature; absent in contexts that cannot start workflows. */
+  workflows?: {
+    create(
+      kind: string,
+      input: Record<string, unknown>,
+      opts?: { project?: string; title?: string },
+    ): Promise<{ id: string }>
+    list(opts?: { project?: string }): Array<{
+      id: string
+      title: string
+      status: string
+      project?: string
+      kind: string
+    }>
+  }
+  loadProjects?: () => Promise<ProjectConfig[]>
 }
 
 export class SyscallError extends Error {
@@ -131,6 +151,59 @@ export async function handleSyscall(
         createdByRun: ctx.runId,
       })
       return { decisionId: d.id }
+    }
+    case 'propose_feature': {
+      const i = input as { project: string; title: string; description: string }
+      if (!ctx.workflows || !ctx.loadProjects) {
+        throw new SyscallError(
+          'propose_feature is not available in this context',
+          'unavailable',
+        )
+      }
+      const project = (await ctx.loadProjects()).find(
+        (p) => p.name === i.project,
+      )
+      if (!project) {
+        throw new SyscallError(
+          `unknown project '${i.project}'`,
+          'unknown_project',
+        )
+      }
+      if (!project.adapter) {
+        throw new SyscallError(
+          `project '${i.project}' is not set up yet; its setup pull request has to be merged first`,
+          'project_not_ready',
+        )
+      }
+      const state = buildProjectContext(
+        project,
+        ctx.log.listDecisions(),
+        // biome-ignore lint/suspicious/noExplicitAny: the narrowed list shape above is all we read
+        ctx.workflows.list({ project: project.name }) as any,
+      )
+      if (projectHasIdeaInFlight(state)) {
+        const waiting = state.openRequests.map((r) => r.title).join(', ')
+        throw new SyscallError(
+          `project '${i.project}' already has an idea in flight (${state.pendingDecisions} pending decision(s); open requests: ${waiting || 'none'}); wait for the human`,
+          'idea_in_flight',
+        )
+      }
+      const wf = await ctx.workflows.create(
+        'feature-request',
+        {
+          project: project.name,
+          title: i.title,
+          description: i.description,
+          autoApprove: false,
+        },
+        { project: project.name, title: i.title },
+      )
+      ctx.log.append({
+        type: 'custom.coo.proposed',
+        runId: ctx.runId,
+        payload: { project: project.name, workflowId: wf.id, title: i.title },
+      })
+      return { workflowId: wf.id }
     }
     default:
       throw new SyscallError(`unhandled tool: ${tool}`, 'unknown_tool')

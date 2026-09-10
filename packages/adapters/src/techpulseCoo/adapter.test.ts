@@ -43,6 +43,11 @@ function fakeCtx(clone: string, osRoot: string): AdapterContext {
         return dec
       },
       listDecisions: () => decisions,
+      resolveDecision: (id: string, status: string) => {
+        const d = decisions.find((x) => x.id === id)
+        if (d) Object.assign(d, { status })
+        return d
+      },
       // biome-ignore lint/suspicious/noExplicitAny: minimal structural stub for EventLog
       updateDecision: (id: string, patch: any) => {
         const d = decisions.find((x) => x.id === id)
@@ -257,5 +262,39 @@ describe('techpulseCooAdapter.sync — hasCooLayout', () => {
     const result = await techpulseCooAdapter.sync(ctx)
 
     expect(result.hasCooLayout).toBe(true)
+  })
+})
+
+describe('techpulseCooAdapter.sync — decisions made in the repo', () => {
+  it('resolves the pending decision when the proposal status is edited to approved on the remote', async () => {
+    const { cloneDir, seedDir } = await createTempTechpulseRepo()
+    const osRoot = mkdtempSync(path.join(tmpdir(), 'agentos-os-'))
+    const ctx = fakeCtx(cloneDir, osRoot)
+    const resolved: Array<[string, string]> = []
+    // biome-ignore lint/suspicious/noExplicitAny: extend the stub for this test
+    ;(ctx.log as any).resolveDecision = (id: string, status: string) => {
+      resolved.push([id, status])
+    }
+    await techpulseCooAdapter.sync(ctx)
+    expect(ctx.log.listDecisions()).toHaveLength(1)
+
+    const seedGit = (await import('simple-git')).default(seedDir)
+    const proposalPath = path.join(
+      seedDir,
+      'docs/missions/coo/proposals/001-dark-mode.md',
+    )
+    writeFileSync(
+      proposalPath,
+      readFileSync(proposalPath, 'utf8').replace(
+        'status: proposed',
+        'status: approved',
+      ),
+    )
+    await seedGit.add('.')
+    await seedGit.commit('approve from phone')
+    await seedGit.push('origin', 'main')
+
+    await techpulseCooAdapter.sync(ctx)
+    expect(resolved).toEqual([['d1', 'approved']])
   })
 })

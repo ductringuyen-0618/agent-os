@@ -71,12 +71,13 @@ afterEach(async () => {
 })
 
 describe('syscall/bin.ts stdio MCP server', () => {
-  it('lists all 8 agentos tools', async () => {
+  it('lists all 9 agentos tools', async () => {
     const { tools } = await client.listTools()
     expect(tools.map((t) => t.name).sort()).toEqual(
       [
         'emit_event',
         'get_context',
+        'propose_feature',
         'read_inbox',
         'read_wiki',
         'remember',

@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { SyscallToolDefs } from './tools.js'
 
 describe('SyscallToolDefs', () => {
-  it('defines exactly the 8 contract §6 tools', () => {
+  it('defines exactly the 9 syscall tools (contract §6 plus propose_feature)', () => {
     expect(Object.keys(SyscallToolDefs).sort()).toEqual(
       [
         'emit_event',
         'get_context',
+        'propose_feature',
         'read_inbox',
         'read_wiki',
         'remember',

@@ -125,6 +125,25 @@ export const SyscallToolDefs = {
       additionalProperties: false,
     },
   },
+  propose_feature: {
+    description:
+      'Start a feature request for a project that waits for a human decision (never auto-approved). Refused while the project already has a pending decision or an unfinished request: one idea in flight per project.',
+    inputSchema: z.object({
+      project: z.string().min(1),
+      title: z.string().min(3).max(120),
+      description: z.string().min(40),
+    }),
+    mcpInputSchema: {
+      type: 'object',
+      properties: {
+        project: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+      },
+      required: ['project', 'title', 'description'],
+      additionalProperties: false,
+    },
+  },
 } as const satisfies Record<string, SyscallToolDef>
 
 export type SyscallToolName = keyof typeof SyscallToolDefs

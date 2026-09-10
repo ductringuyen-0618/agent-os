@@ -9,6 +9,8 @@ export interface InternalRouteDeps {
   wiki: WikiService
   scheduler: Scheduler
   osRoot: string
+  workflows?: SyscallContext['workflows']
+  loadProjects?: SyscallContext['loadProjects']
 }
 
 export function registerInternalRoutes(
@@ -35,6 +37,8 @@ export function registerInternalRoutes(
       log: deps.log,
       wiki: deps.wiki,
       scheduler: deps.scheduler,
+      workflows: deps.workflows,
+      loadProjects: deps.loadProjects,
     }
     try {
       const result = await handleSyscall(body.tool, body.args, ctx)

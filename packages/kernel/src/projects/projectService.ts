@@ -73,6 +73,32 @@ const COO_OPTIONS = {
   reports_path: 'docs/missions/coo/reports',
 }
 
+/** The routines a project gets once its adapter is active. */
+export function projectRoutines(name: string): RoutineConfig[] {
+  return [
+    { name: `${name}-sync`, every: '1h', adapter: name },
+    {
+      name: `${name}-coo`,
+      skill: 'coo-ideate',
+      agent: 'coo',
+      project: name,
+      // 09:00 daemon-local time: one idea a day, on the desk before work starts.
+      cron: '0 9 * * *',
+      permission_mode: 'default',
+      allowed_tools: [
+        'Read',
+        'Glob',
+        'Grep',
+        'mcp__agentos__get_context',
+        'mcp__agentos__read_wiki',
+        'mcp__agentos__propose_feature',
+        'mcp__agentos__remember',
+      ],
+      daily_budget_usd: 1,
+    },
+  ]
+}
+
 async function pathExists(p: string): Promise<boolean> {
   return stat(p)
     .then(() => true)
@@ -169,25 +195,30 @@ export class ProjectService {
     return DEFAULT_ADAPTER
   }
 
+  /**
+   * Every active project runs two routines: `<name>-sync` mirrors the repo
+   * into raw/ hourly, `<name>-coo` proposes one feature a day as a request
+   * that waits for the human. Existing entries in routines.yaml win, so an
+   * operator can tune either without it being overwritten.
+   */
   private async ensureSyncRoutine(name: string): Promise<void> {
-    const routineName = `${name}-sync`
+    const wanted = projectRoutines(name)
     const { file: routinesFile, path: routinesPath } =
       await this.loadRoutinesFile()
-    const existingRoutine = routinesFile.routines.find(
-      (r) => r.name === routineName,
-    )
-    if (!existingRoutine) {
-      const routine: RoutineConfig = {
-        name: routineName,
-        every: '1h',
-        adapter: name,
+    let changed = false
+    for (const routine of wanted) {
+      const existing = routinesFile.routines.find(
+        (r) => r.name === routine.name,
+      )
+      if (existing) {
+        this.scheduler.registerRoutine(existing)
+      } else {
+        routinesFile.routines.push(routine)
+        this.scheduler.registerRoutine(routine)
+        changed = true
       }
-      routinesFile.routines.push(routine)
-      await this.saveRoutinesFile(routinesFile, routinesPath)
-      this.scheduler.registerRoutine(routine)
-    } else {
-      this.scheduler.registerRoutine(existingRoutine)
     }
+    if (changed) await this.saveRoutinesFile(routinesFile, routinesPath)
   }
 
   private async firstSync(
@@ -433,8 +464,9 @@ export class ProjectService {
     const registered = new Set(this.scheduler.list().map((l) => l.routine.name))
     return Promise.all(
       projects.map(async (config) => {
-        const routineName = `${config.name}-sync`
-        const routines = registered.has(routineName) ? [routineName] : []
+        const routines = projectRoutines(config.name)
+          .map((r) => r.name)
+          .filter((n) => registered.has(n))
         const lastSync = this.log.listRuns({
           routine: `adapter:${config.name}`,
           limit: 1,
@@ -456,14 +488,14 @@ export class ProjectService {
 
     await rm(path.join(this.cfg.osRoot, 'projects', `${name}.yaml`))
 
-    const routineName = `${name}-sync`
+    const names = projectRoutines(name).map((r) => r.name)
     const { file: routinesFile, path: routinesPath } =
       await this.loadRoutinesFile()
     routinesFile.routines = routinesFile.routines.filter(
-      (r) => r.name !== routineName,
+      (r) => !names.includes(r.name),
     )
     await this.saveRoutinesFile(routinesFile, routinesPath)
-    this.scheduler.unregisterRoutine(routineName)
+    for (const n of names) this.scheduler.unregisterRoutine(n)
     // clone/ and raw/<name>/ deliberately untouched -- spec §4.2
   }
 }

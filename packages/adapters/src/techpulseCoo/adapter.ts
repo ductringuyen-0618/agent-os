@@ -8,6 +8,7 @@ import type {
 } from '@agentos/kernel/adapters/types'
 import type { Decision } from '@agentos/shared'
 import simpleGit from 'simple-git'
+import { reconcileGithubDecisions } from './decisions.js'
 import { readStatus, setStatus } from './frontmatter.js'
 import {
   bootstrapCooLayout,
@@ -213,6 +214,29 @@ export const techpulseCooAdapter: ProjectAdapter = {
           runId: ctx.runId,
           payload: { file: destRel, oldStatus, newStatus },
         })
+        // The human decided in the repo itself (GitHub's editor, a phone):
+        // honour it as if the dashboard button had been pressed. The file
+        // already carries the status, so only the Decision needs resolving.
+        if (
+          oldStatus === 'proposed' &&
+          (newStatus === 'approved' || newStatus === 'rejected')
+        ) {
+          const pending = ctx.log
+            .listDecisions()
+            .find((d) => d.ref === destRel && d.status === 'pending')
+          if (pending) {
+            ctx.log.resolveDecision(pending.id, newStatus)
+            ctx.log.append({
+              type: 'custom.decision.repo',
+              runId: ctx.runId,
+              payload: {
+                decisionId: pending.id,
+                ref: destRel,
+                status: newStatus,
+              },
+            })
+          }
+        }
       }
       if (newStatus === 'proposed') {
         await ensureDecision(ctx, destRel, content)
@@ -235,6 +259,12 @@ export const techpulseCooAdapter: ProjectAdapter = {
     }
 
     result.hasCooLayout = hasCooLayout
+
+    // Decisions on GitHub: issues for pending ones, verdicts applied.
+    const github = await reconcileGithubDecisions(ctx, (decision, status) =>
+      techpulseCooAdapter.applyDecision({ ...decision, status }, ctx),
+    )
+    if (github.resolved.length > 0) result.events.push('proposal.changed')
     return result
   },
   async applyDecision(decision: Decision, ctx: AdapterContext): Promise<void> {
