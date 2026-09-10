@@ -54,7 +54,9 @@ function main() {
   }
 
   if (argv[0] === 'pr' && argv[1] === 'view') {
-    process.stdout.write(JSON.stringify({ state: process.env.FAKE_GH_PR_STATE ?? 'OPEN' }))
+    process.stdout.write(
+      JSON.stringify({ state: process.env.FAKE_GH_PR_STATE ?? 'OPEN' }),
+    )
     process.exit(0)
   }
 
