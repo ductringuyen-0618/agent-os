@@ -54,6 +54,7 @@ export interface SkillDetail {
   learningsMd: string
   eval: EvalCriteria
   lastOutputMd: string
+  scoreHistory: Array<{ ts: string; runId?: string; score: number }>
 }
 
 function authHeaders(): Record<string, string> {
