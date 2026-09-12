@@ -9,3 +9,4 @@ Shipped: 3/3
 - 2026-09-10: proposed 003-skill-score-trend
 - 2026-09-12: approved 003-skill-score-trend via GitHub issue #14
 - 2026-09-12: shipped 003-skill-score-trend (PR #17, branch coo/skill-score-trend)
+- 2026-09-12: proposed 004-global-pause-switch
