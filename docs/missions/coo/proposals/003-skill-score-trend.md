@@ -1,7 +1,7 @@
 ---
-status: approved
+status: in_progress
 attempts: 0
-branch: null
+branch: coo/skill-score-trend
 ---
 # Skill eval-score trend in the dashboard
 
