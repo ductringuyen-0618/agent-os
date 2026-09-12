@@ -72,5 +72,6 @@ export function wrapUpPrompt(_osRoot: string, skill: string): string {
     `Write skills/${skill}/context/handoff.md summarizing output for any downstream routine.`,
     'Call the remember syscall for any durable facts.',
     `Score this run against skills/${skill}/eval.json and write skills/${skill}/last-output.md.`,
+    `Call emit_event with type "custom.skill_scored" and payload {"skill": "${skill}", "score": <weighted 0-1 total from eval.json>, "criteria": [{"key": ..., "met": true|false}, ...]} so the dashboard can trend this skill's score over time.`,
   ].join('\n')
 }

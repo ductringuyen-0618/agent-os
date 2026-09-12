@@ -94,6 +94,13 @@ describe('wrapUpPrompt', () => {
     expect(text).toContain('remember')
     expect(text).toContain('eval.json')
   })
+
+  it('instructs the run to emit a custom.skill_scored event for the trend', () => {
+    const text = wrapUpPrompt('/some/os', 'heartbeat')
+    expect(text).toContain('emit_event')
+    expect(text).toContain('custom.skill_scored')
+    expect(text).toContain('"skill": "heartbeat"')
+  })
 })
 
 describe('assemblePrompt skill file handling', () => {

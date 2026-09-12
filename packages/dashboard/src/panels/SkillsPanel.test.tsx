@@ -15,6 +15,7 @@ describe('SkillsPanel', () => {
     expect(screen.getByText('9/10 ok')).toBeInTheDocument()
     expect(screen.getByText('via heartbeat')).toBeInTheDocument()
     expect(screen.getByText('$1.20')).toBeInTheDocument()
+    expect(screen.getByText('92%')).toBeInTheDocument()
     await userEvent.click(row)
     expect(
       await screen.findByText(/routines.yaml is the source of truth/),
@@ -22,6 +23,12 @@ describe('SkillsPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Instructions' }))
     expect(
       await screen.findByRole('heading', { name: 'skill' }),
+    ).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Score' }))
+    expect(await screen.findByText('accuracy')).toBeInTheDocument()
+    expect(screen.getByText(/No filler\./)).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /Score trend over 2 scored runs/ }),
     ).toBeInTheDocument()
   })
 
@@ -33,5 +40,26 @@ describe('SkillsPanel', () => {
     })
     render(<SkillsPanel />)
     expect(await screen.findByText('never run')).toBeInTheDocument()
+    expect(screen.queryByText('92%')).not.toBeInTheDocument()
+  })
+
+  it('shows an empty state on the Score tab for a skill that has never been scored', async () => {
+    installMockFetch({
+      'GET /api/skills': () => [
+        { name: 'query', path: 'skills/query', hasLearnings: false },
+      ],
+      'GET /api/skills/query': () => ({
+        skillMd: '# query',
+        learningsMd: '',
+        eval: { criteria: [] },
+        lastOutputMd: '',
+        scoreHistory: [],
+      }),
+    })
+    render(<SkillsPanel />)
+    const row = await screen.findByText('query')
+    await userEvent.click(row)
+    await userEvent.click(await screen.findByRole('button', { name: 'Score' }))
+    expect(await screen.findByText(/No scored runs yet/)).toBeInTheDocument()
   })
 })

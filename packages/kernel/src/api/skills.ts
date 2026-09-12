@@ -73,6 +73,41 @@ export function skillDescription(skillMd: string, max = 220): string {
   return `${cut}…`
 }
 
+export interface SkillScoreEvent {
+  ts: string
+  runId?: string
+  skill: string
+  score: number
+}
+
+/**
+ * A run's wrap-up turn self-reports its score as a `custom.skill_scored`
+ * event; since that payload is agent-authored, treat anything malformed
+ * or missing as absent rather than throwing.
+ */
+export function parseSkillScored(
+  payload: Record<string, unknown>,
+): { skill: string; score: number } | undefined {
+  const { skill, score } = payload
+  if (typeof skill !== 'string' || !skill) return undefined
+  if (typeof score !== 'number' || !Number.isFinite(score)) return undefined
+  return { skill, score }
+}
+
+/** All valid skill_scored events, oldest first, optionally scoped to one skill. */
+function skillScoreEvents(log: EventLog, skill?: string): SkillScoreEvent[] {
+  const out: SkillScoreEvent[] = []
+  for (const e of log.listEvents({
+    types: ['custom.skill_scored'],
+    limit: 5000,
+  })) {
+    const parsed = parseSkillScored(e.payload)
+    if (!parsed || (skill && parsed.skill !== skill)) continue
+    out.push({ ts: e.ts, runId: e.runId, ...parsed })
+  }
+  return out
+}
+
 /**
  * Learnings minus the scaffolding: the "# Learnings: x" title and the
  * bootstrap "(Empty at bootstrap ...)" note. What remains are the dated
@@ -107,6 +142,9 @@ export function registerSkillRoutes(
     }
     const routines = deps.scheduler?.list() ?? []
     const runs = deps.log.listRuns()
+    const lastScoreBySkill = new Map<string, number>()
+    for (const e of skillScoreEvents(deps.log))
+      lastScoreBySkill.set(e.skill, e.score)
     return Promise.all(
       names.map(async (name): Promise<SkillMeta> => {
         const dir = path.join(skillsDir(), name)
@@ -136,6 +174,7 @@ export function registerSkillRoutes(
           lastRunAt: last?.startedAt,
           lastStatus: last?.status,
           costUsd: mine.reduce((sum, r) => sum + (r.costUsd ?? 0), 0),
+          lastScore: lastScoreBySkill.get(name),
         }
       }),
     )
@@ -166,6 +205,9 @@ export function registerSkillRoutes(
       learningsMd: learningEntries(learningsMd),
       eval: evalRaw ? JSON.parse(evalRaw) : { criteria: [] },
       lastOutputMd,
+      scoreHistory: skillScoreEvents(deps.log, name).map(
+        ({ ts, runId, score }) => ({ ts, runId, score }),
+      ),
     }
   })
 }

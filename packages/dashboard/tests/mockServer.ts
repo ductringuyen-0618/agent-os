@@ -49,6 +49,7 @@ export const fixtures = {
     lastRunAt: '2026-09-08T00:00:00Z',
     lastStatus: 'success',
     costUsd: 1.2,
+    lastScore: 0.92,
   } satisfies SkillMeta,
   wikiPages: [
     {
@@ -199,8 +200,17 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
     'GET /api/skills/heartbeat': () => ({
       skillMd: '# skill\n\nCheap, frequent pulse-check across the OS.',
       learningsMd: '- 2026-09-08: routines.yaml is the source of truth',
-      eval: { criteria: [] },
+      eval: {
+        criteria: [
+          { key: 'accuracy', weight: 0.6, description: 'Facts check out.' },
+          { key: 'concise', weight: 0.4, description: 'No filler.' },
+        ],
+      },
       lastOutputMd: '# output',
+      scoreHistory: [
+        { ts: '2026-09-07T00:00:00Z', runId: 'run_0', score: 0.8 },
+        { ts: '2026-09-08T00:00:00Z', runId: 'run_1', score: 0.92 },
+      ],
     }),
     'GET /api/agents': () => [{ name: 'ops', status: 'idle' }],
     'GET /api/costs': () => [

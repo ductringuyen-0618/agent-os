@@ -83,7 +83,9 @@ node packages/cli/dist/bin.js up --root ./my-os/os
 - **Skills** (`skills/<name>/`) — `skill.md` (instructions) +
   `learnings.md` + `eval.json` (self-scoring rubric) + `last-output.md` +
   `context/handoff.md`, all rewritten by a kernel-driven wrap-up turn
-  after every run.
+  after every run. The wrap-up turn also emits a `custom.skill_scored`
+  event with its weighted score against `eval.json`; the dashboard's
+  Skills panel trends that score per skill over time.
 - **Routines** (`routines.yaml`) — the schedule: `every`/`cron`/`on`
   triggers, `after:` chains a handoff from one skill's run into the next,
   `daily_budget_usd` (global or per routine) trips a circuit breaker that
