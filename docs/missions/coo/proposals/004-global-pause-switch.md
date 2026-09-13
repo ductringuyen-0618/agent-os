@@ -1,7 +1,7 @@
 ---
-status: approved
+status: in_progress
 attempts: 0
-branch: null
+branch: coo/global-pause-switch
 ---
 # A global pause switch for the whole daemon
 
