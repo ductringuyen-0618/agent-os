@@ -200,6 +200,22 @@ column.
   cases for the three routes; a dashboard shell test for the banner's
   presence/absence and its load-time state).
 
+## Build notes
+- 2026-09-14: PR #19 open, this proposal's own work is fully green
+  (`pnpm lint`, clean `pnpm build`, `pnpm -r run typecheck`, and the full
+  `kernel`/`dashboard`/`shared` suites plus the PR's new
+  `packages/cli/test/system.command.test.ts`), but the `ci` check on GitHub
+  is red from one unrelated, pre-existing failure:
+  `packages/adapters/src/techpulseCoo/decisions.test.ts >
+  reconcileGithubDecisions > leaves an issue open while nobody has decided,
+  and closes one decided elsewhere`. Confirmed identical on a clean
+  `origin/main` checkout — this PR's diff never touches `decisions.ts` or
+  its test. Root cause and a proposed (unapplied) patch are posted on PR
+  #19; not folding that fix into this PR since it's out of scope. Not
+  counted as a build attempt — nothing on this branch needed a fix.
+  Waiting on `main` to get that test fixed (by this file's proposed patch
+  or otherwise) before `ci` can go green here.
+
 ## Risks / open questions
 - This is the one place agent-os deliberately breaks with its own
   in-memory precedent for per-routine `enabled`/budget state, by
