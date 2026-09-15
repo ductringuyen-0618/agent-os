@@ -92,6 +92,12 @@ node packages/cli/dist/bin.js up --root ./my-os/os
   skips further fires and alerts once a routine's spend for the UTC day
   meets its cap — visible as a "budget hit" chip in the dashboard's
   Routines and Costs panels, resetting on its own at midnight.
+- **Pause** — a daemon-wide "Pause all" control (dashboard header,
+  `agentos pause|resume`, or `/api/system/pause|resume`) stops every
+  cron/interval/event trigger from starting new work, persists across a
+  restart, and can optionally kill runs already in progress. It never
+  touches any routine's own enabled flag, and no syscall can reach it —
+  see `docs/SECURITY.md`.
 - **Wiki** (`wiki/`) — LLM-owned memory; the *only* writer is the
   `remember` syscall, which keeps `index.md` and `log.md` in sync.
 - **Decisions** — created by `request_approval`, resolved only by a human

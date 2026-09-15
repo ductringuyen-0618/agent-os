@@ -1,5 +1,6 @@
 import type {
   Event,
+  PauseState,
   RoutineConfig,
   RoutineDefaults,
   RoutinesFile,
@@ -52,6 +53,11 @@ export class Scheduler {
   // tight `every:` interval trips the alert once per day rather than once
   // per skipped fire.
   private budgetAlertDates = new Map<string, string>()
+  // Loaded once at construction so a fresh Scheduler (e.g. after a daemon
+  // restart) picks up a pause set before the crash instead of silently
+  // clearing it -- unlike setEnabled()/budgetAlertDates, which are
+  // intentionally in-memory-only.
+  private paused: PauseState | null
 
   constructor(
     private cfg: KernelConfig,
@@ -60,7 +66,9 @@ export class Scheduler {
       routine: RoutineConfig,
       payload?: Record<string, unknown>,
     ) => Promise<void>,
-  ) {}
+  ) {
+    this.paused = this.log.getPause()
+  }
 
   load(file: RoutinesFile): void {
     this.defaults = file.defaults
@@ -112,6 +120,7 @@ export class Scheduler {
   }
 
   private trigger(lr: LoadedRoutine, payload?: Record<string, unknown>): void {
+    if (this.paused) return
     if (!lr.enabled) return
     if (lr.config.after && !this.afterOk(lr.config.after)) return
     if (lr.everyMs === undefined) {
@@ -169,6 +178,9 @@ export class Scheduler {
     config: RoutineConfig,
     payload?: Record<string, unknown>,
   ): Promise<string> {
+    if (this.paused) {
+      throw new Error('agent-os is paused')
+    }
     if (this.budgetTripped(config)) {
       throw new Error(`daily budget exceeded for routine "${config.name}"`)
     }
@@ -368,6 +380,36 @@ export class Scheduler {
     const lr = this.routines.get(name)
     if (!lr) throw new Error(`unknown routine: ${name}`)
     lr.enabled = enabled
+  }
+
+  getPause(): PauseState | null {
+    return this.paused
+  }
+
+  /**
+   * Stops every trigger path (cron, interval, event, one-shot schedule)
+   * from starting new work, persisted so a daemon restart can't silently
+   * clear it. Does not touch any routine's own `enabled` flag.
+   */
+  pause(reason?: string, by?: string): PauseState {
+    const state: PauseState = { at: new Date().toISOString(), reason, by }
+    this.paused = state
+    this.log.setPause(state)
+    this.log.append({
+      type: 'ops.alert',
+      payload: { reason: 'daemon_paused', pauseReason: reason, by },
+    })
+    return state
+  }
+
+  /** Clears a pause; every routine returns to exactly the enabled/disabled state it had before. */
+  resume(): void {
+    this.paused = null
+    this.log.setPause(null)
+    this.log.append({
+      type: 'ops.alert',
+      payload: { reason: 'daemon_resumed' },
+    })
   }
 
   /**

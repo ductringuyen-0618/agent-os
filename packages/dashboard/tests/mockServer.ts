@@ -190,6 +190,11 @@ export function installMockFetch(overrides: Record<string, Handler> = {}) {
     'POST /api/routines/heartbeat/run': () => ({ runId: 'run_2' }),
     'POST /api/routines/heartbeat/enable': () => ({ ok: true }),
     'POST /api/routines/heartbeat/disable': () => ({ ok: true }),
+    'GET /api/system/pause': () => null,
+    'POST /api/system/pause': () => ({
+      pause: { at: '2026-09-08T00:00:00Z', reason: 'testing', by: 'dashboard' },
+    }),
+    'POST /api/system/resume': () => ({ ok: true }),
     'GET /api/wiki/index': () => ({ content: '# Index' }),
     'GET /api/wiki/pages': () => fixtures.wikiPages,
     'GET /api/wiki/log': () => ({ content: '## [2026-09-08] note | Hello' }),
