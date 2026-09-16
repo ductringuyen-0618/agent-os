@@ -1,6 +1,6 @@
 # agent-os COO -- State
 
-Shipped: 3/3
+Shipped: 4/4
 
 ## Log
 - 2026-09-09: proposed 001-routine-cost-budgets, 002-agent-mailbox-visibility
@@ -14,3 +14,6 @@ Shipped: 3/3
   pre-existing CI failure in packages/adapters/decisions.test.ts (dated
   test fixture, unrelated to this PR); root cause + proposed patch posted
   on the PR, proposal left in_progress
+- 2026-09-16: shipped 004-global-pause-switch (PR #19, branch
+  coo/global-pause-switch) -- the unrelated CI blocker was fixed on the
+  branch by porting the proposed patch, then CI went green
