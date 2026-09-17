@@ -17,3 +17,4 @@ Shipped: 4/4
 - 2026-09-16: shipped 004-global-pause-switch (PR #19, branch
   coo/global-pause-switch) -- the unrelated CI blocker was fixed on the
   branch by porting the proposed patch, then CI went green
+- 2026-09-17: proposed 005-wiki-page-history (decision issue pending)
