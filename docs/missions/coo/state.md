@@ -20,3 +20,4 @@ Shipped: 4/4
 - 2026-09-17: proposed 005-wiki-page-history (decision issue pending)
 - 2026-09-25: 005-wiki-page-history expired (no decision in 7 days,
   issue #20 closed)
+- 2026-09-25: proposed 006-routine-overlap-guard (decision issue pending)
