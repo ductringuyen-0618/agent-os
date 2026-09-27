@@ -58,4 +58,19 @@ describe('RoutinesPanel', () => {
     )
     expect(await screen.findByText('budget hit')).toBeInTheDocument()
   })
+
+  it('shows an overlap skipped chip when a fire was skipped for overlapping', async () => {
+    installMockFetch({
+      'GET /api/routines': () => [
+        { routine: { name: 'sync', every: '30m' }, overlapSkipped: true },
+        { routine: { name: 'ingest', on: ['raw.added'] } },
+      ],
+    })
+    render(
+      <ToastProvider>
+        <RoutinesPanel />
+      </ToastProvider>,
+    )
+    expect(await screen.findByText('overlap skipped')).toBeInTheDocument()
+  })
 })
