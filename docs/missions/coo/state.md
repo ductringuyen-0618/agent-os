@@ -1,6 +1,7 @@
 # agent-os COO -- State
 
-Shipped: 4/4
+Shipped: 5/5
+
 
 ## Log
 - 2026-09-09: proposed 001-routine-cost-budgets, 002-agent-mailbox-visibility
@@ -29,3 +30,9 @@ Shipped: 4/4
   one set is a sandbox-only GIT_ASKPASS restriction, the other is
   decisions.test.ts's hardcoded 2026-09-10 fixture date now past its own
   7-day expiry window) -- proposal left in_progress pending real CI
+- 2026-09-27: PR #22's first CI run failed on the pre-existing
+  decisions.test.ts dated-fixture bug (confirmed red on main too); ported
+  a minimal fix (explicit `now` via the file's own daysLater() helper) onto
+  the branch and pushed -- CI went green
+- 2026-09-27: shipped 006-routine-overlap-guard (PR #22, branch
+  coo/routine-overlap-guard)
