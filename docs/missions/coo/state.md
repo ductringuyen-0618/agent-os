@@ -21,3 +21,11 @@ Shipped: 4/4
 - 2026-09-25: 005-wiki-page-history expired (no decision in 7 days,
   issue #20 closed)
 - 2026-09-25: proposed 006-routine-overlap-guard (decision issue pending)
+- 2026-09-27: 006-routine-overlap-guard approved via GitHub issue #21
+  (owner commented "Approve"); built and opened PR #22 (branch
+  coo/routine-overlap-guard); local CI-equivalent checks (install, lint,
+  build, typecheck, test) all green except pre-existing packages/adapters
+  failures confirmed unrelated (reproduce identically on the base commit;
+  one set is a sandbox-only GIT_ASKPASS restriction, the other is
+  decisions.test.ts's hardcoded 2026-09-10 fixture date now past its own
+  7-day expiry window) -- proposal left in_progress pending real CI
