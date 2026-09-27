@@ -95,6 +95,7 @@ export function RoutinesPanel() {
                 dailyBudgetUsd,
                 spentTodayUsd,
                 budgetTripped,
+                overlapSkipped,
               } = item
               const paused = routine.enabled === false
               return (
@@ -107,6 +108,9 @@ export function RoutinesPanel() {
                     {paused && <span className="chip ml-2">paused</span>}
                     {budgetTripped && (
                       <span className="chip ml-2">budget hit</span>
+                    )}
+                    {overlapSkipped && (
+                      <span className="chip ml-2">overlap skipped</span>
                     )}
                     {dailyBudgetUsd !== undefined && (
                       <span className="ml-2 text-xs text-muted">

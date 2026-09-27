@@ -20,6 +20,7 @@ export interface RoutineListItem {
   routine: RoutineConfig
   nextRun?: string
   lastRun?: Run
+  overlapSkipped?: boolean
 }
 
 export interface ApiClientOptions {
