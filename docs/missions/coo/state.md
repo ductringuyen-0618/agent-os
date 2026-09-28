@@ -36,3 +36,5 @@ Shipped: 5/5
   the branch and pushed -- CI went green
 - 2026-09-27: shipped 006-routine-overlap-guard (PR #22, branch
   coo/routine-overlap-guard)
+- 2026-09-28: proposed 007-permission-denial-audit-trail (decision issue
+  pending)
