@@ -44,6 +44,25 @@ export interface KillRunResponse {
   ok: boolean
 }
 
+/** Daemon-wide pause state, persisted so a restart cannot silently clear it. */
+export interface PauseState {
+  at: string
+  reason?: string
+  by?: string
+}
+
+export interface PauseRequest {
+  reason?: string
+  by?: string
+  stopRunning?: boolean
+}
+
+export interface PauseResponse {
+  pause: PauseState
+  /** Present only when `stopRunning` was set: how many in-flight runs got killed. */
+  stopped?: number
+}
+
 export interface CreateWorkflowRequest {
   kind: string
   project?: string

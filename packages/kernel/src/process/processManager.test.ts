@@ -209,4 +209,49 @@ describe('ProcessManager', () => {
     expect(result.status).toBe('killed')
     expect(log.getRun(run.id)?.status).toBe('killed')
   })
+
+  it('killAll() returns 0 when nothing is running', () => {
+    const cfg = loadKernelConfig(path.join(tmpDir, 'os'), {
+      claudeBin: fakeClaudeBin,
+      dbPath: path.join(tmpDir, 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    expect(pm.killAll()).toBe(0)
+  })
+
+  it('killAll() kills every in-flight run and empties running()', async () => {
+    const cfg = loadKernelConfig(path.join(tmpDir, 'os'), {
+      claudeBin: fakeClaudeBin,
+      dbPath: path.join(tmpDir, 'agentos.db'),
+    })
+    const pm = new ProcessManager(cfg, log)
+    const runA = log.createRun({ routine: 'heartbeat' })
+    const runB = log.createRun({ routine: 'lint' })
+    // 5 lines * 10ms/line gives a wide enough window to kill mid-flight.
+    process.env.FAKE_CLAUDE_FIXTURE = path.join(
+      fixturesDir,
+      'tool-call-then-success.jsonl',
+    )
+    const spec = {
+      prompt: 'x',
+      systemPromptAppend: '',
+      cwd: tmpDir,
+      model: 'haiku',
+      permissionMode: 'plan' as const,
+      allowedTools: [],
+      addDirs: [],
+      mcpConfigPath: path.join(tmpDir, 'mcp.json'),
+      timeoutMs: 10_000,
+    }
+    const promiseA = pm.start(runA, spec)
+    const promiseB = pm.start(runB, spec)
+    await new Promise((resolve) => setTimeout(resolve, 15))
+
+    expect(pm.killAll()).toBe(2)
+
+    const [resultA, resultB] = await Promise.all([promiseA, promiseB])
+    expect(resultA.status).toBe('killed')
+    expect(resultB.status).toBe('killed')
+    expect(pm.running()).toEqual([])
+  })
 })

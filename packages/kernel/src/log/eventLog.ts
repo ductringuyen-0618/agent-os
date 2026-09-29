@@ -7,6 +7,7 @@ import type {
   Event,
   EventType,
   Message,
+  PauseState,
   Run,
   RunStatus,
   WorkflowInstance,
@@ -462,6 +463,28 @@ export class EventLog {
       .prepare('SELECT * FROM messages ORDER BY ts DESC, rowid DESC LIMIT ?')
       .all(limit)
     return rows.map(rowToMessage)
+  }
+
+  /** Current daemon-wide pause state, or null when the daemon is running normally. */
+  getPause(): PauseState | null {
+    const row = this.db
+      .prepare('SELECT value FROM daemon_state WHERE key = ?')
+      .get('paused') as { value: string } | undefined
+    return row ? (JSON.parse(row.value) as PauseState) : null
+  }
+
+  /** Persists the daemon-wide pause state; pass null to clear it (resume). */
+  setPause(state: PauseState | null): void {
+    if (state === null) {
+      this.db.prepare('DELETE FROM daemon_state WHERE key = ?').run('paused')
+      return
+    }
+    this.db
+      .prepare(
+        `INSERT INTO daemon_state (key, value) VALUES ('paused', ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(JSON.stringify(state))
   }
 
   /** Sum of cost_usd for a routine's runs that started since UTC midnight today. */

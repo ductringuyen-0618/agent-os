@@ -9,6 +9,8 @@ import type {
   ErrorResponse,
   HealthResponse,
   KillRunResponse,
+  PauseRequest,
+  PauseResponse,
 } from '@agentos/shared'
 import fastifyStatic from '@fastify/static'
 import fastifyWebsocket from '@fastify/websocket'
@@ -210,6 +212,20 @@ export function buildServer(kernel: Kernel): FastifyInstance {
       }
     },
   )
+
+  app.get('/api/system/pause', async () => scheduler.getPause())
+
+  app.post<{ Body: PauseRequest }>('/api/system/pause', async (req) => {
+    const { reason, by, stopRunning } = req.body ?? {}
+    const pause = scheduler.pause(reason, by)
+    const stopped = stopRunning ? pm.killAll() : undefined
+    return { pause, stopped } satisfies PauseResponse
+  })
+
+  app.post('/api/system/resume', async () => {
+    scheduler.resume()
+    return { ok: true }
+  })
 
   app.get('/api/decisions', async (req) => {
     const { status } = req.query as { status?: DecisionStatus }
