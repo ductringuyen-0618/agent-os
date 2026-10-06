@@ -38,3 +38,6 @@ Shipped: 5/5
   coo/routine-overlap-guard)
 - 2026-09-28: proposed 007-permission-denial-audit-trail (decision issue
   #23)
+- 2026-10-06: 007-permission-denial-audit-trail expired (no decision in 7
+  days after two nudges, issue #23 closed)
+- 2026-10-06: proposed 008-skill-scaffold-and-lint (decision issue pending)
