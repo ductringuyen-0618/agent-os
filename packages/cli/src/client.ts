@@ -8,6 +8,9 @@ import type {
   DecisionStatus,
   Event,
   HealthResponse,
+  PauseRequest,
+  PauseResponse,
+  PauseState,
   ProjectListItem,
   RoutineConfig,
   Run,
@@ -103,6 +106,21 @@ export class ApiClient {
       `/api/routines/${name}/${enabled ? 'enable' : 'disable'}`,
       { method: 'POST' },
     )
+  }
+
+  getSystemPause(): Promise<PauseState | null> {
+    return this.request('/api/system/pause')
+  }
+
+  pauseSystem(body: PauseRequest = {}): Promise<PauseResponse> {
+    return this.request('/api/system/pause', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
+  resumeSystem(): Promise<{ ok: true }> {
+    return this.request('/api/system/resume', { method: 'POST' })
   }
 
   listDecisions(status?: DecisionStatus): Promise<Decision[]> {

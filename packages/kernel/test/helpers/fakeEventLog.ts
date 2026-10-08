@@ -1,5 +1,6 @@
 import type {
   Event,
+  PauseState,
   Run,
   RunStatus,
   WorkflowInstance,
@@ -176,6 +177,13 @@ export class FakeEventLog {
   }
   deleteWorkflowStep(id: string): void {
     this.workflowSteps = this.workflowSteps.filter((s) => s.id !== id)
+  }
+  private pauseState: PauseState | null = null
+  getPause(): PauseState | null {
+    return this.pauseState
+  }
+  setPause(state: PauseState | null): void {
+    this.pauseState = state
   }
   costForRoutineToday(routine: string): number {
     const todayPrefix = new Date().toISOString().slice(0, 10)

@@ -45,6 +45,12 @@ and any private instance built from it.
 - It cannot reach the network beyond what `WebFetch`/`WebSearch` or an
   adapter's own HTTP calls do — there is no generic shell/exec tool
   granted to any built-in routine.
+- It cannot pause or resume the daemon, or kill every in-flight run at
+  once. `Scheduler.pause()`/`resume()` and `ProcessManager.killAll()` are
+  reachable only through the dashboard, the CLI (`agentos pause|resume`),
+  or their `/api/system/pause|resume` routes — never through a syscall, so
+  no `claude -p` run can call them, same as it cannot approve its own
+  decision.
 
 ## The `--strict-mcp-config` point
 Every spawned `claude -p` process gets exactly one MCP server: the
