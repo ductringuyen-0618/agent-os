@@ -304,6 +304,15 @@ export class ProcessManager {
     return child.kill()
   }
 
+  /** Kills every currently-tracked run; returns how many received kill(). */
+  killAll(): number {
+    let count = 0
+    for (const id of this.children.keys()) {
+      if (this.kill(id)) count++
+    }
+    return count
+  }
+
   running(): string[] {
     return [...this.children.keys()]
   }

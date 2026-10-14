@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Icon, type IconName } from './components/Icon'
+import { SystemPauseBar } from './components/SystemPauseBar'
 import { ToastProvider } from './components/Toast'
 import { CostsPanel } from './panels/CostsPanel'
 import { DecisionsPanel } from './panels/DecisionsPanel'
@@ -101,56 +102,59 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <div className="flex h-screen bg-background text-text">
-        <nav
-          aria-label="agent-os"
-          className="flex w-52 shrink-0 flex-col border-r border-border bg-surface"
-        >
-          <div className="flex items-center gap-2 px-4 pt-4 pb-3">
-            <span className="relative inline-flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-accent" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-            </span>
-            <span className="font-mono text-sm font-medium tracking-tight text-text">
-              agent-os
-            </span>
-          </div>
-          <ul className="flex flex-col gap-0.5 px-2">
-            {NAV.map((n, i) => {
-              const current = active === n.id
-              return (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    onClick={() => go(n.id)}
-                    aria-label={n.label}
-                    aria-current={current ? 'page' : undefined}
-                    className={`group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
-                      current
-                        ? 'bg-raised text-text'
-                        : 'text-muted hover:bg-raised/50 hover:text-text'
-                    }`}
-                  >
-                    <Icon
-                      name={n.icon}
-                      className={current ? 'text-accent' : 'text-muted'}
-                    />
-                    <span className="flex-1">{n.label}</span>
-                    <kbd className="font-mono text-[10px] text-muted/50 group-hover:text-muted">
-                      {i === 9 ? 0 : i + 1}
-                    </kbd>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-          <div className="mt-auto px-4 py-3 text-[11px] text-muted/70">
-            Press 1–9 and 0 to switch panels
-          </div>
-        </nav>
-        <main className="flex-1 overflow-auto p-6">
-          <div className="mx-auto max-w-6xl">{panel}</div>
-        </main>
+      <div className="flex h-screen flex-col bg-background text-text">
+        <SystemPauseBar />
+        <div className="flex flex-1 overflow-hidden">
+          <nav
+            aria-label="agent-os"
+            className="flex w-52 shrink-0 flex-col border-r border-border bg-surface"
+          >
+            <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+              <span className="relative inline-flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-accent" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+              </span>
+              <span className="font-mono text-sm font-medium tracking-tight text-text">
+                agent-os
+              </span>
+            </div>
+            <ul className="flex flex-col gap-0.5 px-2">
+              {NAV.map((n, i) => {
+                const current = active === n.id
+                return (
+                  <li key={n.id}>
+                    <button
+                      type="button"
+                      onClick={() => go(n.id)}
+                      aria-label={n.label}
+                      aria-current={current ? 'page' : undefined}
+                      className={`group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
+                        current
+                          ? 'bg-raised text-text'
+                          : 'text-muted hover:bg-raised/50 hover:text-text'
+                      }`}
+                    >
+                      <Icon
+                        name={n.icon}
+                        className={current ? 'text-accent' : 'text-muted'}
+                      />
+                      <span className="flex-1">{n.label}</span>
+                      <kbd className="font-mono text-[10px] text-muted/50 group-hover:text-muted">
+                        {i === 9 ? 0 : i + 1}
+                      </kbd>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            <div className="mt-auto px-4 py-3 text-[11px] text-muted/70">
+              Press 1–9 and 0 to switch panels
+            </div>
+          </nav>
+          <main className="flex-1 overflow-auto p-6">
+            <div className="mx-auto max-w-6xl">{panel}</div>
+          </main>
+        </div>
       </div>
     </ToastProvider>
   )

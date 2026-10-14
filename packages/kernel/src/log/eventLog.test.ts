@@ -145,4 +145,32 @@ describe('EventLog', () => {
   it('reports zero cost for a routine with no runs yet', () => {
     expect(log.costForRoutineToday('unknown-routine')).toBe(0)
   })
+
+  it('getPause returns null when the daemon has never been paused', () => {
+    expect(log.getPause()).toBeNull()
+  })
+
+  it('round-trips a pause state through setPause/getPause', () => {
+    log.setPause({ at: '2026-09-13T00:00:00Z', reason: 'incident', by: 'cli' })
+    expect(log.getPause()).toEqual({
+      at: '2026-09-13T00:00:00Z',
+      reason: 'incident',
+      by: 'cli',
+    })
+  })
+
+  it('setPause(null) clears a previously persisted pause', () => {
+    log.setPause({ at: '2026-09-13T00:00:00Z' })
+    log.setPause(null)
+    expect(log.getPause()).toBeNull()
+  })
+
+  it('setPause overwrites a previous pause rather than erroring on conflict', () => {
+    log.setPause({ at: '2026-09-13T00:00:00Z', reason: 'first' })
+    log.setPause({ at: '2026-09-13T00:05:00Z', reason: 'second' })
+    expect(log.getPause()).toEqual({
+      at: '2026-09-13T00:05:00Z',
+      reason: 'second',
+    })
+  })
 })

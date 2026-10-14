@@ -212,7 +212,12 @@ describe('reconcileGithubDecisions', () => {
   it('leaves an issue open while nobody has decided, and closes one decided elsewhere', async () => {
     const { ctx } = makeCtx([decision('d1'), decision('d2', 'rejected')])
     const { port, calls } = fakePort([issue(5, 'd1'), issue(6, 'd2')])
-    const out = await reconcileGithubDecisions(ctx, async () => {}, port)
+    const out = await reconcileGithubDecisions(
+      ctx,
+      async () => {},
+      port,
+      daysLater(1),
+    )
     expect(out.resolved).toEqual([])
     expect(calls).toEqual(['labels', 'close #6: Decided elsewhere: rejected'])
   })

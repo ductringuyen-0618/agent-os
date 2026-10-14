@@ -12,6 +12,7 @@ import { requestFeature } from './commands/request.js'
 import { registerRoutinesCommand } from './commands/routines.js'
 import { run as runCommand } from './commands/run.js'
 import { registerSync } from './commands/sync.js'
+import { registerSystemCommands } from './commands/system.js'
 import { up } from './commands/up.js'
 import { registerWorkflowsCommand } from './commands/workflows.js'
 
@@ -98,5 +99,6 @@ registerApprove(program, client())
 registerReject(program, client())
 registerSync(program, client())
 registerProjectsCommand(program, client())
+registerSystemCommands(program, client())
 
 program.parseAsync(process.argv)
