@@ -41,3 +41,6 @@ Shipped: 5/5
 - 2026-10-06: 007-permission-denial-audit-trail expired (no decision in 7
   days after two nudges, issue #23 closed)
 - 2026-10-06: proposed 008-skill-scaffold-and-lint (decision issue pending)
+- 2026-10-14: 008-skill-scaffold-and-lint expired (no decision in 7 days
+  after two nudges, issue #24 closed)
+- 2026-10-14: proposed 009-wiki-staleness-signal (decision issue pending)
