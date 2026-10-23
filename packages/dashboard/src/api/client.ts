@@ -11,6 +11,9 @@ import type {
   GithubRepo,
   ListWorkflowsQuery,
   Message,
+  PauseRequest,
+  PauseResponse,
+  PauseState,
   ProjectListItem,
   ProjectSetupOutcome,
   RoutineConfig,
@@ -139,6 +142,16 @@ export class ApiClient {
   }
   disableRoutine(name: string) {
     return this.req<{ ok: true }>('POST', `/api/routines/${name}/disable`)
+  }
+
+  getSystemPause() {
+    return this.req<PauseState | null>('GET', '/api/system/pause')
+  }
+  pauseSystem(body: PauseRequest = {}) {
+    return this.req<PauseResponse>('POST', '/api/system/pause', body)
+  }
+  resumeSystem() {
+    return this.req<{ ok: true }>('POST', '/api/system/resume')
   }
 
   wikiIndex() {
