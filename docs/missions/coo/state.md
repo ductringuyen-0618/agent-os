@@ -46,4 +46,7 @@ Shipped: 5/5
 - 2026-10-14: proposed 009-wiki-staleness-signal (decision issue pending)
 - 2026-10-22: 009-wiki-staleness-signal expired (no decision in 7 days
   after two nudges, issue #25 closed)
-- 2026-10-22: proposed 010-run-trigger-lineage (decision issue pending)
+- 2026-10-22: proposed 010-run-trigger-lineage
+- 2026-10-30: 010-run-trigger-lineage expired (no decision in 7 days
+  after two nudges, issue #26 closed)
+- 2026-10-30: proposed 011-context-window-budget (decision issue pending) (decision issue pending)
