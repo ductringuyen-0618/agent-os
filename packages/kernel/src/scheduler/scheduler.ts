@@ -24,7 +24,9 @@ interface LoadedRoutine {
   // is stuck -- if it were refreshed unconditionally on every timer tick
   // (as croner-style "every" scheduling naively would), a hung exec would
   // never be flagged as missed because nextRunAt would always trail ~1
-  // interval behind "now".
+  // interval behind "now". Kept alongside (not replaced by) the scheduler's
+  // own inFlightRoutines/inFlightProjects sets, which gate actual overlap
+  // and cover cron/on:/manual runs that have no LoadedRoutine of their own.
   inFlight?: boolean
 }
 
@@ -52,6 +54,13 @@ export class Scheduler {
   // tight `every:` interval trips the alert once per day rather than once
   // per skipped fire.
   private budgetAlertDates = new Map<string, string>()
+  // Routine names, and project names, with a run currently executing --
+  // the overlap gate that `trigger()` and `runRoutine()` both check before
+  // starting a new run.
+  private inFlightRoutines = new Set<string>()
+  private inFlightProjects = new Set<string>()
+  // Same per-day dedup as budgetAlertDates, but for overlap_skipped alerts.
+  private overlapAlertDates = new Map<string, string>()
 
   constructor(
     private cfg: KernelConfig,
@@ -118,9 +127,12 @@ export class Scheduler {
       this.runRoutine(lr.config, payload).catch(() => {})
       return
     }
+    if (this.overlapTripped(lr.config)) return
     lr.inFlight = true
+    this.markInFlight(lr.config)
     this.runTrackedEveryRoutine(lr).finally(() => {
       lr.inFlight = false
+      this.clearInFlight(lr.config)
     })
   }
 
@@ -172,6 +184,9 @@ export class Scheduler {
     if (this.budgetTripped(config)) {
       throw new Error(`daily budget exceeded for routine "${config.name}"`)
     }
+    if (this.overlapTripped(config)) {
+      throw new Error(`routine "${config.name}" is already in flight`)
+    }
     const run = this.log.createRun({
       routine: config.name,
       skill: config.skill,
@@ -179,7 +194,10 @@ export class Scheduler {
       agent: config.agent,
       payload,
     })
-    this.executeRoutine(run, config, payload).catch(() => {})
+    this.markInFlight(config)
+    this.executeRoutine(run, config, payload)
+      .catch(() => {})
+      .finally(() => this.clearInFlight(config))
     return run.id
   }
 
@@ -235,6 +253,44 @@ export class Scheduler {
       })
     }
     return true
+  }
+
+  /**
+   * Checks whether this routine, or its project (if configured), already
+   * has a run in flight. If so, emits one deduped `ops.alert` per routine
+   * per UTC day and returns true so the caller skips spawning a second
+   * concurrent run -- same shape as `budgetTripped`.
+   */
+  private overlapTripped(config: RoutineConfig): boolean {
+    const busy =
+      this.inFlightRoutines.has(config.name) ||
+      (config.project !== undefined &&
+        this.inFlightProjects.has(config.project))
+    if (!busy) return false
+    const today = utcDateKey()
+    if (this.overlapAlertDates.get(config.name) !== today) {
+      this.overlapAlertDates.set(config.name, today)
+      this.log.append({
+        type: 'ops.alert',
+        payload: {
+          routine: config.name,
+          reason: 'overlap_skipped',
+          ...(config.project !== undefined ? { project: config.project } : {}),
+        },
+      })
+    }
+    return true
+  }
+
+  private markInFlight(config: RoutineConfig): void {
+    this.inFlightRoutines.add(config.name)
+    if (config.project !== undefined) this.inFlightProjects.add(config.project)
+  }
+
+  private clearInFlight(config: RoutineConfig): void {
+    this.inFlightRoutines.delete(config.name)
+    if (config.project !== undefined)
+      this.inFlightProjects.delete(config.project)
   }
 
   private async handleFailure(
@@ -409,6 +465,7 @@ export class Scheduler {
     dailyBudgetUsd?: number
     spentTodayUsd?: number
     budgetTripped?: boolean
+    overlapSkipped?: boolean
   }> {
     return Array.from(this.routines.values()).map((lr) => {
       const dailyBudgetUsd = this.effectiveDailyBudget(lr.config)
@@ -423,6 +480,8 @@ export class Scheduler {
             : this.log.costForRoutineToday(lr.config.name),
         budgetTripped:
           this.budgetAlertDates.get(lr.config.name) === utcDateKey(),
+        overlapSkipped:
+          this.overlapAlertDates.get(lr.config.name) === utcDateKey(),
       }
     })
   }

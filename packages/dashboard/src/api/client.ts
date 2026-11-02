@@ -43,6 +43,7 @@ export interface RoutineListItem {
   dailyBudgetUsd?: number
   spentTodayUsd?: number
   budgetTripped?: boolean
+  overlapSkipped?: boolean
 }
 export interface CostEntry {
   day: string
