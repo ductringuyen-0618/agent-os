@@ -49,4 +49,12 @@ Shipped: 5/5
 - 2026-10-22: proposed 010-run-trigger-lineage
 - 2026-10-30: 010-run-trigger-lineage expired (no decision in 7 days
   after two nudges, issue #26 closed)
-- 2026-10-30: proposed 011-context-window-budget (decision issue pending) (decision issue pending)
+- 2026-10-30: proposed 011-context-window-budget (decision issue #27)
+- 2026-11-02: 011-context-window-budget approved via GitHub issue #27
+  (label agentos:approve); built and opened PR #28 (branch
+  coo/context-window-budget); local CI-equivalent checks (install, lint,
+  build, typecheck, test) all green except pre-existing packages/adapters
+  and one packages/cli integration-test failure confirmed unrelated
+  (identical with and without this diff via git stash; a sandbox-only
+  GIT_ASKPASS/temp-path restriction) -- proposal left in_progress pending
+  real CI
