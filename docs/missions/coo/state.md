@@ -1,6 +1,6 @@
 # agent-os COO -- State
 
-Shipped: 5/5
+Shipped: 6/6
 
 
 ## Log
@@ -58,3 +58,7 @@ Shipped: 5/5
   (identical with and without this diff via git stash; a sandbox-only
   GIT_ASKPASS/temp-path restriction) -- proposal left in_progress pending
   real CI
+- 2026-11-02: shipped 011-context-window-budget (PR #28, branch
+  coo/context-window-budget) -- PR's real CI (run 41496543953) passed
+  in full on the first attempt, including `pnpm test`, confirming the
+  local sandbox failures were unrelated as suspected
