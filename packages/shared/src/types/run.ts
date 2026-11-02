@@ -22,6 +22,7 @@ export interface Run {
   endedAt?: string
   inputTokens?: number
   outputTokens?: number
+  contextWindow?: number
   costUsd?: number
   error?: string
 }

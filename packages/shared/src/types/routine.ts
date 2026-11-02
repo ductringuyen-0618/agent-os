@@ -13,6 +13,7 @@ export interface RoutineDefaults {
   max_attempts: number
   timeout_ms: number
   daily_budget_usd?: number
+  context_warn_pct?: number
 }
 
 export interface RoutineConfig {
@@ -37,6 +38,7 @@ export interface RoutineConfig {
   max_attempts?: number
   timeout_ms?: number
   daily_budget_usd?: number
+  context_warn_pct?: number
 }
 
 export interface WorkflowsConfig {

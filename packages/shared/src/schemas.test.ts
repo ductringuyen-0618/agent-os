@@ -164,6 +164,25 @@ routines:
       parseRoutinesFile('defaults: {}\nroutines: "not-an-array"'),
     ).toThrow()
   })
+  it('keeps context_warn_pct on defaults and on a routine override', () => {
+    const parsed = parseRoutinesFile(`
+defaults:
+  model: sonnet
+  permission_mode: plan
+  allowed_tools: []
+  max_attempts: 2
+  timeout_ms: 300000
+  context_warn_pct: 0.85
+routines:
+  - name: heartbeat
+    every: 30m
+    skill: heartbeat
+    agent: ops
+    context_warn_pct: 0.9
+`)
+    expect(parsed.defaults.context_warn_pct).toBe(0.85)
+    expect(parsed.routines[0].context_warn_pct).toBe(0.9)
+  })
 })
 
 describe('RoutinesFileSchema', () => {

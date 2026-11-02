@@ -1,4 +1,8 @@
-import type { Run, RunStatus } from '@agentos/shared'
+import {
+  DEFAULT_CONTEXT_WARN_PCT,
+  type Run,
+  type RunStatus,
+} from '@agentos/shared'
 import { useCallback, useEffect, useState } from 'react'
 import { ApiClient, ApiError } from '../api/client'
 import { useEvents } from '../api/ws'
@@ -8,7 +12,7 @@ import { ErrorState } from '../components/ErrorState'
 import { RunStream } from '../components/RunStream'
 import { SkeletonRows } from '../components/Skeleton'
 import { StatusBadge } from '../components/StatusBadge'
-import { duration, relativeTime, usd } from '../lib/time'
+import { ctxPct, duration, relativeTime, usd } from '../lib/time'
 
 const client = new ApiClient()
 
@@ -103,6 +107,7 @@ export function RunsPanel() {
               <th className="font-normal">Run</th>
               <th className="font-normal">Started</th>
               <th className="font-normal">Took</th>
+              <th className="text-right font-normal">Ctx</th>
               <th className="text-right font-normal">Cost</th>
             </tr>
           </thead>
@@ -142,6 +147,24 @@ export function RunsPanel() {
                 </td>
                 <td className="font-mono text-xs text-muted">
                   {duration(r.startedAt, r.endedAt, now)}
+                </td>
+                <td className="text-right font-mono text-xs">
+                  {(() => {
+                    const pct = ctxPct(r.inputTokens, r.contextWindow)
+                    if (pct === undefined)
+                      return <span className="text-muted">—</span>
+                    return (
+                      <span
+                        className={
+                          pct >= DEFAULT_CONTEXT_WARN_PCT * 100
+                            ? 'chip border-warn/50 text-warn'
+                            : 'text-muted'
+                        }
+                      >
+                        {pct}% ctx
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td className="text-right font-mono text-xs text-muted">
                   {usd(r.costUsd)}

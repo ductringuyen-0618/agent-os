@@ -60,6 +60,7 @@ export const RunSchema = z.object({
   endedAt: z.string().optional(),
   inputTokens: z.number().optional(),
   outputTokens: z.number().optional(),
+  contextWindow: z.number().optional(),
   costUsd: z.number().optional(),
   error: z.string().optional(),
 })
@@ -115,6 +116,7 @@ export const RoutineDefaultsSchema = z.object({
   allowed_tools: z.array(z.string()),
   max_attempts: z.number().int(),
   timeout_ms: z.number().int(),
+  context_warn_pct: z.number().optional(),
 })
 
 export const RoutineConfigSchema = z
@@ -143,6 +145,7 @@ export const RoutineConfigSchema = z
       .optional(),
     max_attempts: z.number().int().optional(),
     timeout_ms: z.number().int().optional(),
+    context_warn_pct: z.number().optional(),
   })
   .refine(
     (r) => [r.every, r.cron, r.on].filter((v) => v !== undefined).length <= 1,

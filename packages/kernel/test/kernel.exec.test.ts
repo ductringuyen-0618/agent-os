@@ -57,4 +57,64 @@ describe('kernel.ts exec wiring', () => {
     expect((kernel.pm.start as any).mock.calls[0][1].model).toBe('haiku')
     await kernel.stop()
   })
+
+  it('stores the run context window and raises an ops.alert once inputTokens crosses the warn threshold', async () => {
+    const osRoot = await makeOsRoot()
+    const kernel = createKernel({
+      osRoot,
+      runtimeDir: path.join(osRoot, '..', '.agentos'),
+      dbPath: ':memory:',
+      claudeBin: 'node',
+      host: '127.0.0.1',
+      port: 4996,
+      logLevel: 'info',
+    })
+    // 'haiku' isn't a known model id in CONTEXT_WINDOWS, so this also
+    // exercises the 200,000-token fallback window.
+    kernel.pm.start = vi.fn().mockResolvedValue({
+      status: 'success',
+      sessionId: 's2',
+      costUsd: 0,
+      inputTokens: 180_000,
+      outputTokens: 1,
+    })
+    await kernel.start()
+    const runId = await kernel.scheduler.runNow('heartbeat')
+    await new Promise((r) => setTimeout(r, 50))
+    const run = kernel.log.getRun(runId)
+    expect(run?.contextWindow).toBe(200_000)
+    const alerts = kernel.log.listEvents({ types: ['ops.alert'] })
+    expect(
+      alerts.some((a) => a.payload.reason === 'context_budget_warning'),
+    ).toBe(true)
+    await kernel.stop()
+  })
+
+  it('raises no context-budget ops.alert when inputTokens stays under the warn threshold', async () => {
+    const osRoot = await makeOsRoot()
+    const kernel = createKernel({
+      osRoot,
+      runtimeDir: path.join(osRoot, '..', '.agentos'),
+      dbPath: ':memory:',
+      claudeBin: 'node',
+      host: '127.0.0.1',
+      port: 4995,
+      logLevel: 'info',
+    })
+    kernel.pm.start = vi.fn().mockResolvedValue({
+      status: 'success',
+      sessionId: 's3',
+      costUsd: 0,
+      inputTokens: 1_000,
+      outputTokens: 1,
+    })
+    await kernel.start()
+    await kernel.scheduler.runNow('heartbeat')
+    await new Promise((r) => setTimeout(r, 50))
+    const alerts = kernel.log.listEvents({ types: ['ops.alert'] })
+    expect(
+      alerts.some((a) => a.payload.reason === 'context_budget_warning'),
+    ).toBe(false)
+    await kernel.stop()
+  })
 })

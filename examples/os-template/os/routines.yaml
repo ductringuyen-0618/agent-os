@@ -15,6 +15,12 @@ defaults:
   # Once a routine's spend for the current UTC day meets its cap, the
   # scheduler skips further fires (one ops.alert, no silent pause) until
   # the cap resets at UTC midnight.
+  context_warn_pct: 0.85
+  # Once a run's reported input tokens reach this fraction of its model's
+  # context window, the kernel raises one context_budget_warning ops.alert
+  # for that run (visible in the dashboard's Runs panel) -- a warning
+  # signal only, never a circuit breaker. A routine can override its own
+  # below, same as daily_budget_usd.
 
 routines:
   - name: heartbeat
