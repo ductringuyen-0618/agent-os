@@ -1,8 +1,10 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import {
+  DEFAULT_CONTEXT_WARN_PCT,
   type RoutineConfig,
   type RoutinesFile,
+  contextWindowFor,
   parseRoutinesFile,
 } from '@agentos/shared'
 import type { FastifyInstance } from 'fastify'
@@ -44,6 +46,15 @@ export interface Kernel {
 async function loadRoutinesFile(osRoot: string): Promise<RoutinesFile> {
   const text = await fs.readFile(path.join(osRoot, 'routines.yaml'), 'utf8')
   return parseRoutinesFile(text)
+}
+
+/** `inputTokens / contextWindow`, or undefined if either is missing. */
+function computeContextPct(
+  inputTokens: number | undefined,
+  contextWindow: number | undefined,
+): number | undefined {
+  if (inputTokens === undefined || contextWindow === undefined) return undefined
+  return inputTokens / contextWindow
 }
 
 class KernelImpl implements Kernel {
@@ -135,14 +146,31 @@ class KernelImpl implements Kernel {
             unindexedRaw: await this.wiki.listUnindexedRaw(),
             routineStatus: this.scheduler
               .list()
-              .map(({ routine: r, nextRun, lastRun }) => ({
-                name: r.name,
-                enabled: r.enabled !== false,
-                nextRun: nextRun ?? null,
-                lastRun: lastRun
-                  ? { status: lastRun.status, endedAt: lastRun.endedAt ?? null }
-                  : null,
-              })),
+              .map(({ routine: r, nextRun, lastRun }) => {
+                const warnPct =
+                  r.context_warn_pct ??
+                  // biome-ignore lint/style/noNonNullAssertion: set unconditionally at the top of exec()
+                  this.routinesFile!.defaults.context_warn_pct ??
+                  DEFAULT_CONTEXT_WARN_PCT
+                const contextPct = computeContextPct(
+                  lastRun?.inputTokens,
+                  lastRun?.contextWindow,
+                )
+                return {
+                  name: r.name,
+                  enabled: r.enabled !== false,
+                  nextRun: nextRun ?? null,
+                  lastRun: lastRun
+                    ? {
+                        status: lastRun.status,
+                        endedAt: lastRun.endedAt ?? null,
+                        ...(contextPct !== undefined && contextPct >= warnPct
+                          ? { contextBudgetWarning: true }
+                          : {}),
+                      }
+                    : null,
+                }
+              }),
           })
         : JSON.stringify({ ...(payload ?? {}), ...(projectCtx ?? {}) })
 
@@ -187,12 +215,32 @@ class KernelImpl implements Kernel {
       },
       { skill: routine.skill, osRoot: this.cfg.osRoot, ...common },
     )
+    const contextWindow = contextWindowFor(common.model)
+    const contextPct = computeContextPct(result.inputTokens, contextWindow)
+    const warnPct =
+      routine.context_warn_pct ??
+      defaults.context_warn_pct ??
+      DEFAULT_CONTEXT_WARN_PCT
     this.log.updateRun(activeRun.id, {
       costUsd: result.costUsd,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
+      contextWindow,
       sessionId: result.sessionId,
     })
+    if (contextPct !== undefined && contextPct >= warnPct) {
+      this.log.append({
+        type: 'ops.alert',
+        payload: {
+          routine: routine.name,
+          reason: 'context_budget_warning',
+          model: common.model,
+          inputTokens: result.inputTokens,
+          contextWindow,
+          pct: contextPct,
+        },
+      })
+    }
     if (result.status !== 'success') {
       throw new Error(
         result.error ??

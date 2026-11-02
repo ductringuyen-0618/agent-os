@@ -68,6 +68,7 @@ function rowToRun(row: any): Run {
     endedAt: row.ended_at ?? undefined,
     inputTokens: row.input_tokens ?? undefined,
     outputTokens: row.output_tokens ?? undefined,
+    contextWindow: row.context_window ?? undefined,
     costUsd: row.cost_usd ?? undefined,
     error: row.error ?? undefined,
   }
@@ -169,13 +170,21 @@ export class EventLog {
 
   /** Additive column migrations for databases created by older builds. */
   private migrate() {
-    const cols = (
+    const decisionCols = (
       this.db.prepare('PRAGMA table_info(decisions)').all() as Array<{
         name: string
       }>
     ).map((c) => c.name)
-    if (!cols.includes('project'))
+    if (!decisionCols.includes('project'))
       this.db.exec('ALTER TABLE decisions ADD COLUMN project TEXT')
+
+    const runCols = (
+      this.db.prepare('PRAGMA table_info(runs)').all() as Array<{
+        name: string
+      }>
+    ).map((c) => c.name)
+    if (!runCols.includes('context_window'))
+      this.db.exec('ALTER TABLE runs ADD COLUMN context_window INTEGER')
   }
 
   append(e: Omit<Event, 'id' | 'ts'>): Event {
@@ -218,8 +227,8 @@ export class EventLog {
     const attempt = r.attempt ?? 1
     this.db
       .prepare(
-        `INSERT INTO runs (id, routine, skill, adapter, agent, status, attempt, payload, session_id, pid, started_at, ended_at, input_tokens, output_tokens, cost_usd, error)
-         VALUES (@id, @routine, @skill, @adapter, @agent, 'queued', @attempt, @payload, @sessionId, @pid, @startedAt, @endedAt, @inputTokens, @outputTokens, @costUsd, @error)`,
+        `INSERT INTO runs (id, routine, skill, adapter, agent, status, attempt, payload, session_id, pid, started_at, ended_at, input_tokens, output_tokens, context_window, cost_usd, error)
+         VALUES (@id, @routine, @skill, @adapter, @agent, 'queued', @attempt, @payload, @sessionId, @pid, @startedAt, @endedAt, @inputTokens, @outputTokens, @contextWindow, @costUsd, @error)`,
       )
       .run({
         id,
@@ -235,6 +244,7 @@ export class EventLog {
         endedAt: r.endedAt ?? null,
         inputTokens: r.inputTokens ?? null,
         outputTokens: r.outputTokens ?? null,
+        contextWindow: r.contextWindow ?? null,
         costUsd: r.costUsd ?? null,
         error: r.error ?? null,
       })
@@ -250,7 +260,7 @@ export class EventLog {
       .prepare(
         `UPDATE runs SET routine=@routine, skill=@skill, adapter=@adapter, agent=@agent, status=@status, attempt=@attempt,
          payload=@payload, session_id=@sessionId, pid=@pid, started_at=@startedAt, ended_at=@endedAt,
-         input_tokens=@inputTokens, output_tokens=@outputTokens, cost_usd=@costUsd, error=@error WHERE id=@id`,
+         input_tokens=@inputTokens, output_tokens=@outputTokens, context_window=@contextWindow, cost_usd=@costUsd, error=@error WHERE id=@id`,
       )
       .run({
         id,
@@ -267,6 +277,7 @@ export class EventLog {
         endedAt: merged.endedAt ?? null,
         inputTokens: merged.inputTokens ?? null,
         outputTokens: merged.outputTokens ?? null,
+        contextWindow: merged.contextWindow ?? null,
         costUsd: merged.costUsd ?? null,
         error: merged.error ?? null,
       })

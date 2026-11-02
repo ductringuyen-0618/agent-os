@@ -60,3 +60,12 @@ export function clockTime(iso: string | undefined) {
 export function todayKey(now = Date.now()) {
   return new Date(now).toISOString().slice(0, 10)
 }
+
+/** Rounded `inputTokens / contextWindow` percentage, or undefined if either is missing. */
+export function ctxPct(
+  inputTokens: number | undefined,
+  contextWindow: number | undefined,
+): number | undefined {
+  if (inputTokens === undefined || contextWindow === undefined) return undefined
+  return Math.round((inputTokens / contextWindow) * 100)
+}

@@ -23,7 +23,11 @@ The kernel injects a JSON task payload with exactly this shape (see `kernel.ts`'
 ```
 `unindexedRaw` is `WikiService.listUnindexedRaw()`. `routineStatus` is
 `Scheduler.list()`, reduced to `{ name, enabled, nextRun, lastRun }` (`lastRun`
-is `null` if the routine has never run).
+is `null` if the routine has never run). `lastRun` also carries
+`contextBudgetWarning: true` when that run's reported input tokens reached
+its model's `context_warn_pct` (default 0.85) of its context window --
+the same `context_budget_warning` `ops.alert` the kernel raises itself,
+surfaced here so this skill can note it without a new syscall.
 
 ## Steps
 1. For each path in `unindexedRaw`, call `mcp__agentos__emit_event` with
@@ -31,7 +35,8 @@ is `null` if the routine has never run).
    only path by which new raw files get indexed — the `ingest` routine
    listens for `raw.added`.
 2. For each entry in `routineStatus`: if `lastRun` is `null` while `nextRun`
-   is in the past, or `lastRun.status === "failed"`, write a short note via
+   is in the past, or `lastRun.status === "failed"`, or
+   `lastRun.contextBudgetWarning === true`, write a short note via
    `mcp__agentos__remember` to page `agents/ops.md` (title includes the
    routine name and timestamp). Do **not** call `emit_event` for this —
    `emit_event` only accepts `raw.added` or `custom.*`; `ops.alert` is
