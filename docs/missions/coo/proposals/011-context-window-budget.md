@@ -1,7 +1,7 @@
 ---
-status: approved
+status: in_progress
 attempts: 0
-branch: null
+branch: coo/context-window-budget
 ---
 # Warn before a run's context window fills, not after it degrades
 
