@@ -63,4 +63,4 @@ Shipped: 6/6
   in full on the first attempt, including `pnpm test`, confirming the
   local sandbox failures were unrelated as suspected
 - 2026-11-03: proposed 012-restart-recovery-side-effect-guard (decision
-  issue pending)
+  issue #29)
