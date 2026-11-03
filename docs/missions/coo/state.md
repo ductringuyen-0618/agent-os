@@ -62,3 +62,5 @@ Shipped: 6/6
   coo/context-window-budget) -- PR's real CI (run 41496543953) passed
   in full on the first attempt, including `pnpm test`, confirming the
   local sandbox failures were unrelated as suspected
+- 2026-11-03: proposed 012-restart-recovery-side-effect-guard (decision
+  issue pending)
